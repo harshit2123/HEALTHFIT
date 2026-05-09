@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/harshit/.npm/_logs/**)",
+      "Bash(mv /Users/harshit/Desktop/Healthfit/everything-claude-code /Users/harshit/Desktop/everything-claude-code)",
+      "Bash(bash install.sh)",
+      "Bash(bash install.sh --target claude --profile complete --dry-run)",
+      "Bash(bash install.sh --target claude --profile developer)",
+      "Bash(cp -r /Users/harshit/Desktop/everything-claude-code/rules .claude/ecc-rules)",
+      "Bash(cp -r /Users/harshit/Desktop/everything-claude-code/skills .claude/ecc-skills)",
+      "Bash(cp -r /Users/harshit/Desktop/everything-claude-code/agents .claude/ecc-agents)",
+      "Bash(cp -r /Users/harshit/Desktop/everything-claude-code/hooks .claude/ecc-hooks)",
+      "Bash(cp -r /Users/harshit/Desktop/everything-claude-code/commands .claude/ecc-commands)",
+      "mcp__claude_ai_Figma__generate_diagram",
+      "Bash(npm create *)",
+      "Bash(npm init *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(*)",
+      "Read(**)",
+      "Write(**)",
+      "Edit(**)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~*)",
+      "Bash(git push --force*)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | bash)"
+    ],
+    "additionalDirectories": [
+      "/Users/harshit/Desktop"
+    ]
+  }
+}

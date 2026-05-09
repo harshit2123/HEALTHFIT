@@ -1,0 +1,473 @@
+// Spacefit DB Schema
+// Multi-tenant: B2B gyms (org-scoped) + B2C individuals (no org)
+// Master Admin sees all (cross-org reads bypassed via role check, not schema)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =====================================================
+// ENUMS
+// =====================================================
+
+enum UserRole {
+  MASTER_ADMIN
+  ORG_OWNER
+  TRAINER
+  ORG_MEMBER
+  INDIVIDUAL_USER
+}
+
+enum AccountType {
+  B2B
+  B2C
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  EXPIRING
+  EXPIRED
+  CANCELLED
+}
+
+enum PersonalTier {
+  FREE
+  TRIAL
+  PREMIUM
+}
+
+enum WorkoutType {
+  CARDIO
+  STRENGTH
+  FLEXIBILITY
+  SPORTS
+  OTHER
+}
+
+enum Intensity {
+  LIGHT
+  MODERATE
+  HIGH
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  SNACKS
+  DINNER
+}
+
+enum GoalType {
+  LOSE_WEIGHT
+  GAIN_MUSCLE
+  BUILD_ENDURANCE
+  IMPROVE_FLEXIBILITY
+  CUSTOM
+}
+
+enum GoalStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SCHEDULED
+  SENT
+  FAILED
+}
+
+// =====================================================
+// CORE: USER + ORG
+// =====================================================
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  phone         String?     @unique
+  passwordHash  String
+  name          String
+  role          UserRole
+  accountType   AccountType
+  orgId         String? // null for INDIVIDUAL_USER and MASTER_ADMIN
+  isActive      Boolean     @default(true)
+  lastLoginAt   DateTime?
+  // Lead-source tracking (B2B): which trainer/owner brought this member in?
+  // null for: self-signups (B2B owners + B2C individuals) and master admins.
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  org              Organization?         @relation("OrgMembers", fields: [orgId], references: [id])
+  ownedOrg         Organization?         @relation("OrgOwner")
+  profile          UserProfile?
+  personalSub      PersonalSubscription?
+  memberSub        MemberSubscription?
+  workouts         WorkoutLog[]
+  calories         CalorieLog[]
+  goals            Goal[]
+  healthMetrics    HealthMetric[]
+  assignedToTrainer TrainerAssignment[] @relation("MemberAssignment")
+  trainerAssignments TrainerAssignment[] @relation("TrainerAssignment")
+  goalsAssigned    Goal[]                @relation("GoalAssignedBy")
+  refreshTokens    RefreshToken[]
+
+  // Self-relation for who-created-whom
+  createdBy        User?  @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdMembers   User[] @relation("UserCreatedBy")
+
+  @@index([orgId])
+  @@index([email])
+  @@index([role])
+  @@index([createdById])
+}
+
+model UserProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  age             Int?
+  gender          String?
+  dateOfBirth     DateTime?
+  heightCm        Decimal? @db.Decimal(5, 2)
+  currentWeightKg Decimal? @db.Decimal(5, 2)
+  fitnessLevel    String? // BEGINNER, INTERMEDIATE, ADVANCED
+  medicalNotes    String?  @db.Text
+  profilePicUrl   String?
+  timezone        String   @default("Asia/Kolkata")
+  language        String   @default("en")
+  weightUnit      String   @default("kg")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  ownerId     String   @unique // 1 owner per org
+  description String?
+  logoUrl     String?
+  address     String?
+  phone       String?
+  email       String?
+  timezone    String   @default("Asia/Kolkata")
+  currency    String   @default("INR")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner            User                 @relation("OrgOwner", fields: [ownerId], references: [id])
+  members          User[]               @relation("OrgMembers")
+  subscriptionPlans SubscriptionPlan[]
+  memberSubs       MemberSubscription[]
+  notifications    Notification[]
+  trainerAssignments TrainerAssignment[]
+
+  @@index([ownerId])
+}
+
+// =====================================================
+// AUTH
+// =====================================================
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// =====================================================
+// SUBSCRIPTIONS — B2B (Org-managed)
+// =====================================================
+
+model SubscriptionPlan {
+  id             String   @id @default(uuid())
+  orgId          String
+  name           String
+  description    String?
+  priceInr       Decimal  @db.Decimal(10, 2)
+  durationDays   Int
+  features       Json // [{ key, label, enabled }]
+  memberCapacity Int?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  org           Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscriptions MemberSubscription[]
+
+  @@index([orgId])
+}
+
+model MemberSubscription {
+  id           String             @id @default(uuid())
+  memberId     String             @unique // 1 active sub per member
+  orgId        String
+  planId       String
+  startedAt    DateTime           @default(now())
+  expiresAt    DateTime
+  status       SubscriptionStatus @default(ACTIVE)
+  amountPaidInr Decimal           @db.Decimal(10, 2)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  member User              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  org    Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  plan   SubscriptionPlan  @relation(fields: [planId], references: [id])
+
+  @@index([orgId])
+  @@index([memberId])
+  @@index([expiresAt])
+}
+
+// =====================================================
+// SUBSCRIPTIONS — B2C (Individual)
+// =====================================================
+
+model PersonalSubscription {
+  id         String       @id @default(uuid())
+  userId     String       @unique
+  tier       PersonalTier @default(TRIAL)
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
+  premiumStartedAt DateTime?
+  premiumEndsAt    DateTime?
+  status     SubscriptionStatus @default(TRIAL)
+  autoRenew  Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// =====================================================
+// HEALTH DATA — Shared by B2B + B2C
+// orgId is nullable: null = B2C individual, set = B2B member
+// =====================================================
+
+model WorkoutLog {
+  id              String      @id @default(uuid())
+  userId          String
+  orgId           String? // null for B2C
+  loggedDate      DateTime
+  workoutType     WorkoutType
+  durationMin     Int
+  intensity       Intensity
+  caloriesBurned  Int?
+  notes           String?     @db.Text
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises WorkoutExercise[]
+
+  @@index([userId, loggedDate])
+  @@index([orgId])
+}
+
+model WorkoutExercise {
+  id            String   @id @default(uuid())
+  workoutLogId  String
+  exerciseName  String
+  sets          Int?
+  reps          Int?
+  weightKg      Decimal? @db.Decimal(5, 2)
+  distanceKm    Decimal? @db.Decimal(6, 2)
+  timeMin       Decimal? @db.Decimal(5, 2)
+  muscleGroups  Json // ["chest", "triceps"]
+  notes         String?
+
+  workout WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+
+  @@index([workoutLogId])
+}
+
+model FoodItem {
+  id          String   @id @default(uuid())
+  name        String
+  nameLocal   String? // Hindi name
+  category    String? // grain, dal, vegetable, dairy, etc.
+  servingSize String // "1 roti", "100g", "1 cup"
+  caloriesPer100g Decimal @db.Decimal(7, 2)
+  proteinG    Decimal  @db.Decimal(5, 2)
+  carbsG      Decimal  @db.Decimal(5, 2)
+  fatG        Decimal  @db.Decimal(5, 2)
+  fiberG      Decimal? @db.Decimal(5, 2)
+  isCustom    Boolean  @default(false) // user-added
+  createdByUserId String?
+  isIndian    Boolean  @default(true)
+
+  // AI-generated tracking
+  source      FoodSource @default(MANUAL)
+  isVerified  Boolean    @default(false) // admin-verified after AI generation
+  searchKey   String? // normalized name for lookup ("dal tadka" → "dal_tadka")
+  usageCount  Int        @default(0) // how many times this food was logged
+
+  createdAt   DateTime @default(now())
+
+  @@index([name])
+  @@index([category])
+  @@index([searchKey])
+  @@index([usageCount(sort: Desc)])
+}
+
+enum FoodSource {
+  MANUAL       // seed data (ICMR-NIN)
+  USER_CUSTOM  // user-created
+  AI_GENERATED // estimated by Claude
+}
+
+model CalorieLog {
+  id          String   @id @default(uuid())
+  userId      String
+  orgId       String? // null for B2C
+  loggedDate  DateTime
+  mealType    MealType
+  foodName    String
+  servingSize String
+  calories    Decimal  @db.Decimal(7, 2)
+  proteinG    Decimal  @db.Decimal(5, 2)
+  carbsG      Decimal  @db.Decimal(5, 2)
+  fatG        Decimal  @db.Decimal(5, 2)
+  fiberG      Decimal? @db.Decimal(5, 2)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loggedDate])
+  @@index([orgId])
+}
+
+model Goal {
+  id            String     @id @default(uuid())
+  userId        String
+  orgId         String? // null for B2C
+  goalType      GoalType
+  targetValue   Decimal    @db.Decimal(7, 2)
+  targetUnit    String // "kg", "count", "minutes"
+  startingValue Decimal    @db.Decimal(7, 2)
+  targetDate    DateTime
+  status        GoalStatus @default(ACTIVE)
+  reason        String?    @db.Text
+  assignedById  String? // trainer who assigned (null = self-set)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  completedAt   DateTime?
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User? @relation("GoalAssignedBy", fields: [assignedById], references: [id])
+
+  @@index([userId, status])
+  @@index([orgId])
+}
+
+model HealthMetric {
+  id         String   @id @default(uuid())
+  userId     String
+  orgId      String? // null for B2C
+  metricDate DateTime
+  weightKg   Decimal? @db.Decimal(5, 2)
+  bmi        Decimal? @db.Decimal(4, 2)
+  chestCm    Decimal? @db.Decimal(5, 2)
+  waistCm    Decimal? @db.Decimal(5, 2)
+  hipsCm     Decimal? @db.Decimal(5, 2)
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, metricDate])
+}
+
+// =====================================================
+// TRAINER ASSIGNMENTS (B2B only)
+// =====================================================
+
+model TrainerAssignment {
+  id         String   @id @default(uuid())
+  trainerId  String
+  memberId   String
+  orgId      String
+  isActive   Boolean  @default(true)
+  assignedAt DateTime @default(now())
+
+  trainer User         @relation("TrainerAssignment", fields: [trainerId], references: [id], onDelete: Cascade)
+  member  User         @relation("MemberAssignment", fields: [memberId], references: [id], onDelete: Cascade)
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([trainerId, memberId])
+  @@index([orgId])
+}
+
+// =====================================================
+// NOTIFICATIONS (B2B only — bulk org-wide)
+// =====================================================
+
+model Notification {
+  id              String              @id @default(uuid())
+  orgId           String
+  templateName    String?
+  recipientIds    Json // array of userIds
+  messageText     String              @db.Text
+  channel         NotificationChannel
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+  status          NotificationStatus  @default(PENDING)
+  failureReason   String?
+  whatsappMsgId   String? // for delivery tracking
+  createdAt       DateTime            @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status])
+  @@index([scheduledFor])
+}
+
+// =====================================================
+// AUDIT LOG (Master Admin tracks system activity)
+// =====================================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  orgId       String?
+  action      String // "USER_LOGIN", "ORG_CREATED", "SUB_RENEWED", etc.
+  entityType  String? // "User", "Organization", etc.
+  entityId    String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([orgId])
+  @@index([action])
+  @@index([createdAt])
+}
