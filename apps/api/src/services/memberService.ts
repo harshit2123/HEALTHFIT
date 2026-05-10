@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from '../lib/prisma.js'
 import { env } from '../lib/env.js'
+import { generateTempPassword } from '../lib/passwords.js'
 
 export interface CreateMemberInput {
   email: string
@@ -20,10 +21,6 @@ export interface ListMembersOptions {
   search?: string // by name or email
   trainerId?: string // filter by assigned trainer
   status?: 'ACTIVE' | 'INACTIVE'
-}
-
-function generateTempPassword(): string {
-  return Math.random().toString(36).slice(-10) + 'A1!'
 }
 
 /**

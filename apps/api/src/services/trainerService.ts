@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from '../lib/prisma.js'
 import { env } from '../lib/env.js'
+import { generateTempPassword } from '../lib/passwords.js'
 
 /**
  * Org Owner adds a trainer. Same flow as createMember but role = TRAINER.
@@ -12,7 +13,7 @@ export async function createTrainer(
   const existing = await prisma.user.findUnique({ where: { email: input.email } })
   if (existing) throw new Error('Email already registered')
 
-  const password = input.password ?? Math.random().toString(36).slice(-10) + 'A1!'
+  const password = input.password ?? generateTempPassword()
   const passwordHash = await bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS)
 
   const trainer = await prisma.$transaction(async (tx) => {

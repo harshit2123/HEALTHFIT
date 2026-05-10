@@ -180,7 +180,9 @@ Run `npx prisma generate` to refresh TS client types.
 | 5.2 — UX restructure (bottom nav, calorie ring, FAB, 4-step onboarding, streaks) | ✅ |
 | 6 — Workout tracker (self-improving: PR detection, frequent exercises, last-set pre-fill) | ✅ |
 | 7 — Goals + health metrics + analytics (Recharts: weight line, calorie bars, workout heatmap) | ✅ |
-| 8 — Polish + security audit | 🟡 in progress |
+| 8 — Security audit + polish (rate limits, CSP, CORS, ErrorBoundary, health check, prod-strength secrets) | ✅ |
+
+**MVP feature-complete.** See `PRODUCTION_CHECKLIST.md` before shipping to production.
 
 ---
 
