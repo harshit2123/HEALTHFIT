@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { PortalRouter } from './components/PortalRouter'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { PwaInstallBanner } from './components/PwaInstallBanner'
 
 // Pages (stubs — built out per phase)
 import { LandingPage } from './pages/LandingPage'
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/client/*" element={<ClientPortal />} />
         </Route>
       </Routes>
+      <PwaInstallBanner />
     </BrowserRouter>
   )
 }
