@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { calorieApi, type MealType, type CalorieLog } from '../../../lib/clientApi'
 import { LogMealDialog } from './LogMealDialog'
@@ -23,6 +24,19 @@ export function CaloriesPage() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [logDialog, setLogDialog] = useState<MealType | null>(null)
   const [editLog, setEditLog] = useState<CalorieLog | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // FAB recent-food deeplink: open dialog pre-filled
+  useEffect(() => {
+    const logFoodId = searchParams.get('logFoodId')
+    if (logFoodId) {
+      setLogDialog('SNACKS') // default meal — user can change in dialog
+      // We'd ideally pre-populate the dialog with foodId, but minimum-friction:
+      // open SNACKS dialog and clear URL
+      setSearchParams({}, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const { data: daily, isLoading } = useQuery({
     queryKey: ['calories', date],

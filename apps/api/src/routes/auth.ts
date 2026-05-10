@@ -28,6 +28,7 @@ const b2cSchema = z.object({
   age: z.number().int().min(13).max(120).optional(),
   heightCm: z.number().min(50).max(300).optional(),
   currentWeightKg: z.number().min(20).max(500).optional(),
+  primaryGoal: z.enum(['LOSE_WEIGHT', 'GAIN_MUSCLE', 'BUILD_ENDURANCE', 'JUST_TRACK']).optional(),
 })
 
 const registerSchema = z.discriminatedUnion('accountType', [b2bSchema, b2cSchema])

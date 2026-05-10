@@ -7,6 +7,7 @@ import {
   isAIConfigured,
   type EstimatedFood,
 } from './ai/calorieEstimator.js'
+import { bumpStreak } from './streakService.js'
 
 // =====================================================
 // FOOD SEARCH
@@ -273,7 +274,7 @@ export async function logCalorie(userId: string, orgId: string | null, input: Lo
     throw new Error('Either foodId or full macro values (calories/protein/carbs/fat) required')
   }
 
-  return prisma.calorieLog.create({
+  const log = await prisma.calorieLog.create({
     data: {
       userId,
       orgId,
@@ -288,6 +289,15 @@ export async function logCalorie(userId: string, orgId: string | null, input: Lo
       fiberG,
     },
   })
+
+  // Bump streak (best-effort — don't fail log if streak update errors)
+  try {
+    await bumpStreak(userId)
+  } catch (err) {
+    console.error('[streak] bump failed:', err)
+  }
+
+  return log
 }
 
 export async function deleteCalorieLog(logId: string, userId: string) {

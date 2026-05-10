@@ -105,6 +105,7 @@ export const authApi = {
     age?: number
     heightCm?: number
     currentWeightKg?: number
+    primaryGoal?: 'LOSE_WEIGHT' | 'GAIN_MUSCLE' | 'BUILD_ENDURANCE' | 'JUST_TRACK'
   }): Promise<AuthResult> => {
     const res = await api.post('/auth/register', { ...data, accountType: 'B2C' })
     return res.data.data

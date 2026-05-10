@@ -28,6 +28,8 @@ export interface MyProfile {
     heightCm: string | null
     currentWeightKg: string | null
     fitnessLevel: string | null
+    primaryGoal: string | null
+    streakDays: number
     timezone: string
     language: string
   } | null
@@ -53,6 +55,7 @@ export const clientApi = {
     heightCm: number
     currentWeightKg: number
     fitnessLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
+    primaryGoal: 'LOSE_WEIGHT' | 'GAIN_MUSCLE' | 'BUILD_ENDURANCE' | 'JUST_TRACK'
     timezone: string
     language: string
   }>) => {
@@ -207,6 +210,15 @@ export const calorieApi = {
     return res.data.data
   },
 
+  getStreak: async (): Promise<{
+    streakDays: number
+    streakLastDate: string | null
+    isActiveToday: boolean
+  }> => {
+    const res = await api.get('/client/streak')
+    return res.data.data
+  },
+
   // AI-powered lookup: DB first, AI fallback, cached.
   lookupFood: async (query: string): Promise<{ food: FoodItem; source: 'DB' | 'AI'; aiAvailable: boolean }> => {
     const res = await api.post('/client/foods/lookup', { query })
@@ -229,5 +241,198 @@ export const calorieApi = {
   }> => {
     const res = await api.get('/client/foods/ai-status')
     return res.data.data
+  },
+}
+
+// =====================================================
+// WORKOUTS
+// =====================================================
+
+export type ExerciseCategory =
+  | 'STRENGTH'
+  | 'CARDIO'
+  | 'FLEXIBILITY'
+  | 'SPORTS'
+  | 'BODYWEIGHT'
+  | 'OTHER'
+
+export type WorkoutType = 'CARDIO' | 'STRENGTH' | 'FLEXIBILITY' | 'SPORTS' | 'OTHER'
+export type Intensity = 'LIGHT' | 'MODERATE' | 'HIGH'
+
+export interface Exercise {
+  id: string
+  name: string
+  nameLocal: string | null
+  category: ExerciseCategory
+  primaryMuscles: string[]
+  secondaryMuscles?: string[] | null
+  equipment: string | null
+  defaultUnit: 'REPS' | 'TIME' | 'DISTANCE'
+  metPerKg: string | null
+  isCustom: boolean
+  source: 'MANUAL' | 'USER_CUSTOM' | 'AI_GENERATED'
+  isVerified: boolean
+  usageCount: number
+  frequency?: number
+}
+
+export interface WorkoutSet {
+  id: string
+  setIndex: number
+  reps: number | null
+  weightKg: string | null
+  distanceKm: string | null
+  timeSeconds: number | null
+  rpe: number | null
+  isWarmup: boolean
+  isPR: boolean
+  notes: string | null
+}
+
+export interface WorkoutEntry {
+  id: string
+  exerciseId: string | null
+  exerciseName: string
+  orderIndex: number
+  notes: string | null
+  sets: WorkoutSet[]
+  exercise?: Exercise | null
+}
+
+export interface Workout {
+  id: string
+  loggedDate: string
+  workoutType: WorkoutType
+  durationMin: number
+  intensity: Intensity
+  caloriesBurned: number | null
+  notes: string | null
+  routineId: string | null
+  exercises: WorkoutEntry[]
+}
+
+export interface Routine {
+  id: string
+  name: string
+  description: string | null
+  isSuggested: boolean
+  usageCount: number
+  lastUsedAt: string | null
+  exercises: Array<{
+    id: string
+    exerciseId: string | null
+    exerciseName: string
+    orderIndex: number
+    setScheme: string | null
+    notes: string | null
+  }>
+}
+
+export interface LogSetData {
+  reps?: number
+  weightKg?: number
+  distanceKm?: number
+  timeSeconds?: number
+  rpe?: number
+  isWarmup?: boolean
+  notes?: string
+}
+
+export interface LogWorkoutData {
+  loggedDate?: string
+  workoutType: WorkoutType
+  durationMin: number
+  intensity: Intensity
+  notes?: string
+  routineId?: string
+  entries: Array<{
+    exerciseId?: string
+    exerciseName: string
+    notes?: string
+    sets: LogSetData[]
+  }>
+}
+
+export const workoutApi = {
+  searchExercises: async (q: string, limit = 20): Promise<Exercise[]> => {
+    const res = await api.get('/client/exercises/search', { params: { q, limit } })
+    return res.data.data
+  },
+  getFrequentExercises: async (limit = 8): Promise<Exercise[]> => {
+    const res = await api.get('/client/exercises/frequent', { params: { limit } })
+    return res.data.data
+  },
+  lookupExercise: async (
+    query: string
+  ): Promise<{ exercise: Exercise; source: 'DB' | 'AI'; aiAvailable: boolean }> => {
+    const res = await api.post('/client/exercises/lookup', { query })
+    return res.data.data
+  },
+  getLastSet: async (exerciseId: string): Promise<WorkoutSet | null> => {
+    const res = await api.get(`/client/exercises/${exerciseId}/last-set`)
+    return res.data.data
+  },
+  log: async (data: LogWorkoutData): Promise<Workout> => {
+    const res = await api.post('/client/workouts', data)
+    return res.data.data
+  },
+  list: async (
+    page = 1,
+    limit = 20
+  ): Promise<{
+    workouts: Workout[]
+    total: number
+    page: number
+    limit: number
+  }> => {
+    const res = await api.get('/client/workouts', { params: { page, limit } })
+    return res.data.data
+  },
+  getDay: async (date: string): Promise<Workout[]> => {
+    const res = await api.get('/client/workouts', { params: { date } })
+    return res.data.data
+  },
+  weeklyStats: async (): Promise<{
+    count: number
+    totalMinutes: number
+    totalCalories: number
+    byType: Record<string, number>
+  }> => {
+    const res = await api.get('/client/workouts/weekly-stats')
+    return res.data.data
+  },
+  get: async (id: string): Promise<Workout> => {
+    const res = await api.get(`/client/workouts/${id}`)
+    return res.data.data
+  },
+  delete: async (id: string) => {
+    await api.delete(`/client/workouts/${id}`)
+  },
+  listRoutines: async (): Promise<Routine[]> => {
+    const res = await api.get('/client/routines')
+    return res.data.data
+  },
+  suggestRoutine: async (): Promise<{
+    name: string
+    exercises: Array<{ exerciseId: string; exerciseName: string; setScheme: string }>
+  } | null> => {
+    const res = await api.get('/client/routines/suggest')
+    return res.data.data
+  },
+  createRoutine: async (data: {
+    name: string
+    description?: string
+    exercises: Array<{
+      exerciseId?: string
+      exerciseName: string
+      setScheme?: string
+      notes?: string
+    }>
+  }): Promise<Routine> => {
+    const res = await api.post('/client/routines', data)
+    return res.data.data
+  },
+  deleteRoutine: async (id: string) => {
+    await api.delete(`/client/routines/${id}`)
   },
 }

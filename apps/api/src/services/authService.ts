@@ -24,6 +24,7 @@ export interface RegisterB2CInput {
   age?: number
   heightCm?: number
   currentWeightKg?: number
+  primaryGoal?: 'LOSE_WEIGHT' | 'GAIN_MUSCLE' | 'BUILD_ENDURANCE' | 'JUST_TRACK'
 }
 
 export interface AuthResponse {
@@ -159,6 +160,7 @@ export async function registerB2CIndividual(input: RegisterB2CInput): Promise<Au
         age: input.age,
         heightCm: input.heightCm,
         currentWeightKg: input.currentWeightKg,
+        primaryGoal: input.primaryGoal,
       },
     })
 

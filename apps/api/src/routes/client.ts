@@ -17,6 +17,25 @@ import {
   parseMealText,
   getPersonalFoodSuggestions,
 } from '../services/calorieService.js'
+import { getStreak } from '../services/streakService.js'
+import {
+  searchExercises,
+  getExercise,
+  createCustomExercise,
+  lookupOrEstimateExercise,
+  getFrequentExercises,
+  getLastSetForExercise,
+  logWorkout,
+  getWorkoutById,
+  deleteWorkout,
+  getWorkoutsForDay,
+  listWorkouts,
+  getWeeklyStats,
+  listRoutines,
+  createRoutine,
+  deleteRoutine,
+  suggestRoutineFromHistory,
+} from '../services/workoutService.js'
 import { isAIConfigured, getActiveProvider, getProviderStatus } from '../services/ai/calorieEstimator.js'
 
 export const clientRouter = Router()
@@ -31,6 +50,7 @@ const updateProfileSchema = z.object({
   heightCm: z.number().min(50).max(300).optional(),
   currentWeightKg: z.number().min(20).max(500).optional(),
   fitnessLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']).optional(),
+  primaryGoal: z.enum(['LOSE_WEIGHT', 'GAIN_MUSCLE', 'BUILD_ENDURANCE', 'JUST_TRACK']).optional(),
   timezone: z.string().optional(),
   language: z.string().optional(),
 })
@@ -115,12 +135,271 @@ clientRouter.post(
 
 // ==================== STUBS (built in later phases) ====================
 
-clientRouter.post('/workouts', (_req, res) => {
-  res.json({ success: true, data: { message: 'Log workout — Phase 6' }, error: null })
+// =====================================================
+// WORKOUTS
+// =====================================================
+
+const setSchema = z.object({
+  reps: z.number().int().nonnegative().optional(),
+  weightKg: z.number().nonnegative().optional(),
+  distanceKm: z.number().nonnegative().optional(),
+  timeSeconds: z.number().int().nonnegative().optional(),
+  rpe: z.number().int().min(1).max(10).optional(),
+  isWarmup: z.boolean().optional(),
+  notes: z.string().optional(),
 })
 
-clientRouter.get('/workouts', (_req, res) => {
-  res.json({ success: true, data: { message: 'Workout history — Phase 6' }, error: null })
+const entrySchema = z.object({
+  exerciseId: z.string().uuid().optional(),
+  exerciseName: z.string().min(1),
+  notes: z.string().optional(),
+  sets: z.array(setSchema).min(1),
+})
+
+const logWorkoutSchema = z.object({
+  loggedDate: z.string().datetime().optional(),
+  workoutType: z.enum(['CARDIO', 'STRENGTH', 'FLEXIBILITY', 'SPORTS', 'OTHER']),
+  durationMin: z.number().int().positive(),
+  intensity: z.enum(['LIGHT', 'MODERATE', 'HIGH']),
+  notes: z.string().optional(),
+  routineId: z.string().uuid().optional(),
+  entries: z.array(entrySchema).min(1),
+})
+
+clientRouter.post('/workouts', async (req, res, next) => {
+  try {
+    const parsed = logWorkoutSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, data: null, error: parsed.error.flatten() })
+      return
+    }
+    const workout = await logWorkout(req.user!.userId, req.user!.orgId, {
+      ...parsed.data,
+      loggedDate: parsed.data.loggedDate ? new Date(parsed.data.loggedDate) : undefined,
+      entries: parsed.data.entries.map((e) => ({
+        exerciseId: e.exerciseId,
+        exerciseName: e.exerciseName,
+        notes: e.notes,
+        sets: e.sets.map((s) => ({
+          exerciseName: e.exerciseName,
+          reps: s.reps,
+          weightKg: s.weightKg,
+          distanceKm: s.distanceKm,
+          timeSeconds: s.timeSeconds,
+          rpe: s.rpe,
+          isWarmup: s.isWarmup,
+          notes: s.notes,
+        })),
+      })),
+    })
+    res.status(201).json({ success: true, data: workout, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/workouts', async (req, res, next) => {
+  try {
+    const dateStr = typeof req.query['date'] === 'string' ? req.query['date'] : undefined
+    if (dateStr) {
+      const list = await getWorkoutsForDay(req.user!.userId, new Date(dateStr))
+      res.json({ success: true, data: list, error: null })
+      return
+    }
+    const result = await listWorkouts(req.user!.userId, {
+      page: req.query['page'] ? Number(req.query['page']) : undefined,
+      limit: req.query['limit'] ? Number(req.query['limit']) : undefined,
+    })
+    res.json({ success: true, data: result, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/workouts/weekly-stats', async (req, res, next) => {
+  try {
+    const stats = await getWeeklyStats(req.user!.userId)
+    res.json({ success: true, data: stats, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/workouts/:id', async (req, res, next) => {
+  try {
+    const workout = await getWorkoutById(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: workout, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Workout not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+clientRouter.delete('/workouts/:id', async (req, res, next) => {
+  try {
+    await deleteWorkout(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: null, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Workout not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+// =====================================================
+// EXERCISES
+// =====================================================
+
+clientRouter.get('/exercises/search', async (req, res, next) => {
+  try {
+    const q = typeof req.query['q'] === 'string' ? req.query['q'] : ''
+    const limit = req.query['limit'] ? Number(req.query['limit']) : 20
+    const items = await searchExercises(q, req.user!.userId, limit)
+    res.json({ success: true, data: items, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/exercises/frequent', async (req, res, next) => {
+  try {
+    const limit = req.query['limit'] ? Number(req.query['limit']) : 8
+    const items = await getFrequentExercises(req.user!.userId, limit)
+    res.json({ success: true, data: items, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/exercises/:id/last-set', async (req, res, next) => {
+  try {
+    const set = await getLastSetForExercise(req.user!.userId, req.params['id']!)
+    res.json({ success: true, data: set, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/exercises/:id', async (req, res, next) => {
+  try {
+    const ex = await getExercise(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: ex, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Exercise not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+const lookupExerciseSchema = z.object({ query: z.string().min(1).max(100) })
+
+clientRouter.post('/exercises/lookup', async (req, res, next) => {
+  try {
+    const parsed = lookupExerciseSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, data: null, error: parsed.error.flatten() })
+      return
+    }
+    const result = await lookupOrEstimateExercise(parsed.data.query, req.user!.userId)
+    res.json({ success: true, data: result, error: null })
+  } catch (err) {
+    if (err instanceof Error) {
+      res.status(400).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+const customExerciseSchema = z.object({
+  name: z.string().min(2),
+  category: z.enum(['STRENGTH', 'CARDIO', 'FLEXIBILITY', 'SPORTS', 'BODYWEIGHT', 'OTHER']),
+  primaryMuscles: z.array(z.string()).min(1),
+  equipment: z.string().optional(),
+  defaultUnit: z.enum(['REPS', 'TIME', 'DISTANCE']).optional(),
+})
+
+clientRouter.post('/exercises', async (req, res, next) => {
+  try {
+    const parsed = customExerciseSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, data: null, error: parsed.error.flatten() })
+      return
+    }
+    const ex = await createCustomExercise(req.user!.userId, parsed.data)
+    res.status(201).json({ success: true, data: ex, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// =====================================================
+// ROUTINES (templates)
+// =====================================================
+
+clientRouter.get('/routines', async (req, res, next) => {
+  try {
+    const items = await listRoutines(req.user!.userId)
+    res.json({ success: true, data: items, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/routines/suggest', async (req, res, next) => {
+  try {
+    const suggestion = await suggestRoutineFromHistory(req.user!.userId)
+    res.json({ success: true, data: suggestion, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+const routineExerciseSchema = z.object({
+  exerciseId: z.string().uuid().optional(),
+  exerciseName: z.string().min(1),
+  setScheme: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+const routineSchema = z.object({
+  name: z.string().min(2),
+  description: z.string().optional(),
+  exercises: z.array(routineExerciseSchema).min(1),
+})
+
+clientRouter.post('/routines', async (req, res, next) => {
+  try {
+    const parsed = routineSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, data: null, error: parsed.error.flatten() })
+      return
+    }
+    const r = await createRoutine(req.user!.userId, parsed.data)
+    res.status(201).json({ success: true, data: r, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.delete('/routines/:id', async (req, res, next) => {
+  try {
+    await deleteRoutine(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: null, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Routine not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
 })
 
 // =====================================================
@@ -245,6 +524,15 @@ clientRouter.get('/calories/target', async (req, res, next) => {
   try {
     const target = await getSuggestedDailyTarget(req.user!.userId)
     res.json({ success: true, data: { dailyCalorieTarget: target }, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/streak', async (req, res, next) => {
+  try {
+    const streak = await getStreak(req.user!.userId)
+    res.json({ success: true, data: streak, error: null })
   } catch (err) {
     next(err)
   }

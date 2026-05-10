@@ -45,6 +45,7 @@ export async function updateMyProfile(
     heightCm?: number
     currentWeightKg?: number
     fitnessLevel?: string
+    primaryGoal?: string
     timezone?: string
     language?: string
   }

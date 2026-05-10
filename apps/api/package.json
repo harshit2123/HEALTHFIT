@@ -11,7 +11,9 @@
     "test": "vitest run",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed-foods.ts",
+    "db:seed": "tsx prisma/seed-foods.ts && tsx prisma/seed-exercises.ts",
+    "db:seed:foods": "tsx prisma/seed-foods.ts",
+    "db:seed:exercises": "tsx prisma/seed-exercises.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
