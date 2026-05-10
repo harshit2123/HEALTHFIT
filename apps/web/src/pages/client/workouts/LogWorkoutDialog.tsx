@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   workoutApi,
@@ -7,6 +7,7 @@ import {
   type Intensity,
   type LogWorkoutData,
 } from '../../../lib/clientApi'
+import { ExerciseCard } from '../../../components/ui/ExerciseCard'
 
 interface Props {
   onClose: () => void
@@ -25,16 +26,11 @@ interface DraftEntry {
   exerciseId: string
   exerciseName: string
   category: Exercise['category']
+  primaryMuscles: string[]
   defaultUnit: Exercise['defaultUnit']
   sets: DraftSet[]
 }
 
-/**
- * Strong/Hevy-style logger.
- * Step 1: pick exercises (search/AI lookup, recent pills surfaced first)
- * Step 2: log sets per exercise (pre-fills last weights/reps)
- * Step 3: confirm & save
- */
 export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
   const [step, setStep] = useState<'PICK' | 'LOG'>('PICK')
   const [search, setSearch] = useState('')
@@ -68,7 +64,6 @@ export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
   })
 
   async function addEntry(exercise: Exercise) {
-    // Pre-fill: fetch last set
     let firstSet: DraftSet = {}
     try {
       const last = await workoutApi.getLastSet(exercise.id)
@@ -81,7 +76,7 @@ export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
         }
       }
     } catch {
-      // No last set, blank first set
+      // no last set
     }
 
     setEntries((prev) => [
@@ -90,6 +85,7 @@ export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
         exerciseId: exercise.id,
         exerciseName: exercise.name,
         category: exercise.category,
+        primaryMuscles: exercise.primaryMuscles ?? [],
         defaultUnit: exercise.defaultUnit,
         sets: [firstSet],
       },
@@ -104,10 +100,7 @@ export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
     setEntries((prev) =>
       prev.map((e, i) => {
         if (i !== entryIdx) return e
-        return {
-          ...e,
-          sets: e.sets.map((s, j) => (j === setIdx ? { ...s, [field]: value } : s)),
-        }
+        return { ...e, sets: e.sets.map((s, j) => (j === setIdx ? { ...s, [field]: value } : s)) }
       })
     )
   }
@@ -117,24 +110,9 @@ export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
       prev.map((e, i) => {
         if (i !== entryIdx) return e
         const last = e.sets[e.sets.length - 1] ?? {}
-        // Pre-fill from previous set in same exercise
         return { ...e, sets: [...e.sets, { ...last, isWarmup: false }] }
       })
     )
-  }
-
-  function removeSet(entryIdx: number, setIdx: number) {
-    setEntries((prev) =>
-      prev.map((e, i) => {
-        if (i !== entryIdx) return e
-        return { ...e, sets: e.sets.filter((_, j) => j !== setIdx) }
-      })
-    )
-  }
-
-  function handleAILookup() {
-    if (!search.trim()) return
-    aiLookupMutation.mutate(search.trim())
   }
 
   function handleSave() {
@@ -156,323 +134,68 @@ export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
   return (
     <div style={overlay} onClick={onClose}>
       <div style={dialog} onClick={(e) => e.stopPropagation()}>
-        <header style={header}>
-          <h2 style={{ margin: 0, fontSize: '1.125rem' }}>
-            {step === 'PICK' ? 'Pick exercises' : 'Log sets'}
+        {/* Header */}
+        <header style={dialogHeader}>
+          <h2 style={dialogTitle}>
+            {step === 'PICK' ? 'Pick Exercises' : 'Log Sets'}
           </h2>
-          <button onClick={onClose} style={closeBtn}>
-            ×
-          </button>
+          <button onClick={onClose} style={closeBtn} aria-label="Close">×</button>
         </header>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+        {/* Body */}
+        <div style={dialogBody}>
           {step === 'PICK' && (
-            <>
-              <input
-                type="search"
-                placeholder="Search exercises…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-                style={input}
-              />
-
-              {/* Selected pile */}
-              {entries.length > 0 && (
-                <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#ecfdf5', borderRadius: '8px' }}>
-                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.625rem', color: '#065f46', textTransform: 'uppercase', fontWeight: 600 }}>
-                    Selected ({entries.length})
-                  </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
-                    {entries.map((e, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => removeEntry(idx)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: 'white',
-                          border: '1px solid #a7f3d0',
-                          borderRadius: '999px',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          color: '#065f46',
-                        }}
-                      >
-                        {e.exerciseName} ×
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Frequent (self-improving signal) */}
-              {!search.trim() && frequent && frequent.length > 0 && (
-                <div style={{ marginTop: '1rem' }}>
-                  <p style={{ margin: '0 0 0.375rem', fontSize: '0.625rem', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 600 }}>
-                    Most logged
-                  </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
-                    {frequent.map((ex) => (
-                      <button
-                        key={ex.id}
-                        onClick={() => addEntry(ex)}
-                        style={{
-                          padding: '0.375rem 0.625rem',
-                          background: '#eef2ff',
-                          border: '1px solid #c7d2fe',
-                          borderRadius: '999px',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          color: '#3730a3',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {ex.name} <span style={{ opacity: 0.6 }}>×{ex.frequency ?? 0}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {noResults ? (
-                <div style={{ marginTop: '1rem', textAlign: 'center', padding: '1.5rem' }}>
-                  <p style={{ color: '#9ca3af', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
-                    Not in our DB. Let AI estimate it.
-                  </p>
-                  <button
-                    onClick={handleAILookup}
-                    disabled={aiLookupMutation.isPending}
-                    style={{
-                      padding: '0.625rem 1rem',
-                      background: '#6366f1',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {aiLookupMutation.isPending ? 'Estimating…' : `✨ Estimate "${search}"`}
-                  </button>
-                </div>
-              ) : searchResults && searchResults.length > 0 ? (
-                <ul style={{ listStyle: 'none', padding: 0, margin: '1rem 0 0' }}>
-                  {searchResults.map((ex) => {
-                    const isSelected = entries.some((e) => e.exerciseId === ex.id)
-                    return (
-                      <li key={ex.id}>
-                        <button
-                          onClick={() => !isSelected && addEntry(ex)}
-                          disabled={isSelected}
-                          style={{
-                            width: '100%',
-                            padding: '0.625rem 0.875rem',
-                            background: isSelected ? '#ecfdf5' : 'white',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            cursor: isSelected ? 'default' : 'pointer',
-                            textAlign: 'left',
-                            marginBottom: '0.375rem',
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{ex.name}</span>
-                            <span style={{ fontSize: '0.625rem', color: '#9ca3af' }}>
-                              {ex.equipment ?? ex.category} {isSelected && '· ✓'}
-                            </span>
-                          </div>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : null}
-            </>
+            <PickStep
+              search={search}
+              setSearch={setSearch}
+              entries={entries}
+              searchResults={searchResults}
+              frequent={frequent}
+              noResults={!!noResults}
+              aiPending={aiLookupMutation.isPending}
+              onAdd={addEntry}
+              onRemove={removeEntry}
+              onAILookup={() => { if (search.trim()) aiLookupMutation.mutate(search.trim()) }}
+            />
           )}
 
           {step === 'LOG' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Workout meta */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-                <Field label="Duration (min)">
-                  <input
-                    type="number"
-                    min={1}
-                    value={meta.durationMin}
-                    onChange={(e) => setMeta({ ...meta, durationMin: Number(e.target.value) || 0 })}
-                    style={input}
-                  />
-                </Field>
-                <Field label="Intensity">
-                  <select
-                    value={meta.intensity}
-                    onChange={(e) => setMeta({ ...meta, intensity: e.target.value as Intensity })}
-                    style={input}
-                  >
-                    <option value="LIGHT">Light</option>
-                    <option value="MODERATE">Moderate</option>
-                    <option value="HIGH">High</option>
-                  </select>
-                </Field>
-              </div>
-
-              {entries.map((entry, eIdx) => (
-                <div
-                  key={eIdx}
-                  style={{
-                    padding: '0.875rem',
-                    background: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '10px',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <strong style={{ fontSize: '0.875rem' }}>{entry.exerciseName}</strong>
-                    <button
-                      onClick={() => removeEntry(eIdx)}
-                      style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.75rem' }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  {/* Set rows */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                    <thead>
-                      <tr>
-                        <th style={th}>Set</th>
-                        {entry.defaultUnit === 'REPS' && <th style={th}>kg</th>}
-                        {entry.defaultUnit === 'REPS' && <th style={th}>reps</th>}
-                        {entry.defaultUnit === 'TIME' && <th style={th}>sec</th>}
-                        {entry.defaultUnit === 'DISTANCE' && <th style={th}>km</th>}
-                        <th style={th}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {entry.sets.map((set, sIdx) => (
-                        <tr key={sIdx}>
-                          <td style={td}>
-                            <span style={{ fontWeight: 600 }}>{sIdx + 1}</span>
-                          </td>
-                          {entry.defaultUnit === 'REPS' && (
-                            <>
-                              <td style={td}>
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  value={set.weightKg ?? ''}
-                                  onChange={(e) =>
-                                    updateSet(eIdx, sIdx, 'weightKg', e.target.value ? Number(e.target.value) : undefined)
-                                  }
-                                  style={smallInput}
-                                />
-                              </td>
-                              <td style={td}>
-                                <input
-                                  type="number"
-                                  value={set.reps ?? ''}
-                                  onChange={(e) =>
-                                    updateSet(eIdx, sIdx, 'reps', e.target.value ? Number(e.target.value) : undefined)
-                                  }
-                                  style={smallInput}
-                                />
-                              </td>
-                            </>
-                          )}
-                          {entry.defaultUnit === 'TIME' && (
-                            <td style={td}>
-                              <input
-                                type="number"
-                                value={set.timeSeconds ?? ''}
-                                onChange={(e) =>
-                                  updateSet(eIdx, sIdx, 'timeSeconds', e.target.value ? Number(e.target.value) : undefined)
-                                }
-                                style={smallInput}
-                              />
-                            </td>
-                          )}
-                          {entry.defaultUnit === 'DISTANCE' && (
-                            <td style={td}>
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={set.distanceKm ?? ''}
-                                onChange={(e) =>
-                                  updateSet(eIdx, sIdx, 'distanceKm', e.target.value ? Number(e.target.value) : undefined)
-                                }
-                                style={smallInput}
-                              />
-                            </td>
-                          )}
-                          <td style={td}>
-                            {entry.sets.length > 1 && (
-                              <button
-                                onClick={() => removeSet(eIdx, sIdx)}
-                                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '1rem' }}
-                              >
-                                ×
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <button
-                    onClick={() => addSet(eIdx)}
-                    style={{
-                      marginTop: '0.5rem',
-                      padding: '0.375rem 0.75rem',
-                      background: '#f3f4f6',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    + Add set
-                  </button>
-                </div>
-              ))}
-            </div>
+            <LogStep
+              entries={entries}
+              meta={meta}
+              onMetaChange={(field, value) => setMeta({ ...meta, [field]: value })}
+              onWeightChange={(eIdx, v) => updateSet(eIdx, 0, 'weightKg', v)}
+              onRepsChange={(eIdx, v) => updateSet(eIdx, 0, 'reps', v)}
+              onAddSet={addSet}
+              onRemoveEntry={removeEntry}
+            />
           )}
         </div>
 
-        {/* Footer actions */}
-        <footer
-          style={{
-            padding: '1rem 1.25rem',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            gap: '0.5rem',
-            background: 'white',
-          }}
-        >
+        {/* Footer */}
+        <footer style={dialogFooter}>
           {step === 'PICK' && (
             <button
               onClick={() => setStep('LOG')}
               disabled={entries.length === 0}
-              style={primaryBtn}
+              className="sf-btn-primary"
+              style={footerBtn}
             >
               Continue ({entries.length})
             </button>
           )}
           {step === 'LOG' && (
             <>
-              <button
-                onClick={() => setStep('PICK')}
-                style={{ ...primaryBtn, background: '#f3f4f6', color: '#374151' }}
-              >
+              <button onClick={() => setStep('PICK')} className="sf-btn-ghost" style={footerBtn}>
                 Back
               </button>
               <button
                 onClick={handleSave}
                 disabled={saveMutation.isPending}
-                style={primaryBtn}
+                className="sf-btn-primary"
+                style={footerBtn}
               >
-                {saveMutation.isPending ? 'Saving…' : 'Save workout'}
+                {saveMutation.isPending ? 'Saving…' : 'Save Workout'}
               </button>
             </>
           )}
@@ -482,19 +205,174 @@ export function LogWorkoutDialog({ onClose, onSuccess }: Props) {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+// ─── Pick step ───────────────────────────────────────────────────────────
+
+function PickStep({
+  search,
+  setSearch,
+  entries,
+  searchResults,
+  frequent,
+  noResults,
+  aiPending,
+  onAdd,
+  onRemove,
+  onAILookup,
+}: {
+  search: string
+  setSearch: (v: string) => void
+  entries: DraftEntry[]
+  searchResults: Exercise[] | undefined
+  frequent: (Exercise & { frequency?: number })[] | undefined
+  noResults: boolean
+  aiPending: boolean
+  onAdd: (ex: Exercise) => void
+  onRemove: (idx: number) => void
+  onAILookup: () => void
+}) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-      <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151' }}>{label}</span>
-      {children}
-    </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <input
+        type="search"
+        placeholder="Search exercises…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        autoFocus
+        style={searchInput}
+      />
+
+      {entries.length > 0 && (
+        <div style={selectedPile}>
+          <p style={selectedLabel}>Selected ({entries.length})</p>
+          <div style={pillRow}>
+            {entries.map((e, idx) => (
+              <button key={idx} onClick={() => onRemove(idx)} style={selectedPill}>
+                {e.exerciseName} ×
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!search.trim() && frequent && frequent.length > 0 && (
+        <div>
+          <p style={groupLabel}>Most logged</p>
+          <div style={pillRow}>
+            {frequent.map((ex) => (
+              <button key={ex.id} onClick={() => onAdd(ex)} style={frequentPill}>
+                {ex.name} <span style={{ opacity: 0.5 }}>×{ex.frequency ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {noResults ? (
+        <div style={aiPrompt}>
+          <p style={aiPromptText}>Not in our database. Let AI estimate it.</p>
+          <button onClick={onAILookup} disabled={aiPending} className="sf-btn-primary">
+            {aiPending ? 'Estimating…' : `✦ Estimate "${search}"`}
+          </button>
+        </div>
+      ) : searchResults && searchResults.length > 0 ? (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+          {searchResults.map((ex) => {
+            const isSelected = entries.some((e) => e.exerciseId === ex.id)
+            return (
+              <li key={ex.id}>
+                <button
+                  onClick={() => !isSelected && onAdd(ex)}
+                  disabled={isSelected}
+                  style={exRow(isSelected)}
+                >
+                  <span style={{ fontFamily: 'var(--font-body)', fontWeight: 500, fontSize: '0.875rem', color: isSelected ? 'var(--neon)' : 'var(--text-primary)' }}>
+                    {ex.name}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+                    {ex.equipment ?? ex.category} {isSelected && '· ✓'}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+    </div>
   )
 }
 
-const overlay: React.CSSProperties = {
+// ─── Log step ────────────────────────────────────────────────────────────
+
+function LogStep({
+  entries,
+  meta,
+  onMetaChange,
+  onWeightChange,
+  onRepsChange,
+  onAddSet,
+  onRemoveEntry,
+}: {
+  entries: DraftEntry[]
+  meta: { workoutType: WorkoutType; durationMin: number; intensity: Intensity }
+  onMetaChange: (field: 'durationMin' | 'intensity', value: number | Intensity) => void
+  onWeightChange: (entryIdx: number, v: number) => void
+  onRepsChange: (entryIdx: number, v: number) => void
+  onAddSet: (entryIdx: number) => void
+  onRemoveEntry: (entryIdx: number) => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Meta row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <label style={metaLabel}>
+          <span style={metaLabelText}>Duration (min)</span>
+          <input
+            type="number"
+            min={1}
+            value={meta.durationMin}
+            onChange={(e) => onMetaChange('durationMin', Number(e.target.value) || 0)}
+            style={metaInput}
+          />
+        </label>
+        <label style={metaLabel}>
+          <span style={metaLabelText}>Intensity</span>
+          <select
+            value={meta.intensity}
+            onChange={(e) => onMetaChange('intensity', e.target.value as Intensity)}
+            style={metaInput}
+          >
+            <option value="LIGHT">Light</option>
+            <option value="MODERATE">Moderate</option>
+            <option value="HIGH">High</option>
+          </select>
+        </label>
+      </div>
+
+      {entries.map((entry, eIdx) => (
+        <ExerciseCard
+          key={eIdx}
+          exerciseName={entry.exerciseName}
+          category={entry.category}
+          primaryMuscles={entry.primaryMuscles}
+          weightKg={entry.sets[0]?.weightKg}
+          reps={entry.sets[0]?.reps}
+          sets={entry.sets.length}
+          onWeightChange={(v) => onWeightChange(eIdx, v)}
+          onRepsChange={(v) => onRepsChange(eIdx, v)}
+          onAddSet={() => onAddSet(eIdx)}
+          onRemove={() => onRemoveEntry(eIdx)}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ─── Styles ────────────────────────────────────────────────────────────────
+
+const overlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: 'rgba(0,0,0,0.4)',
+  background: 'rgba(0,0,0,0.85)',
   zIndex: 50,
   display: 'flex',
   alignItems: 'center',
@@ -502,9 +380,10 @@ const overlay: React.CSSProperties = {
   padding: '1rem',
 }
 
-const dialog: React.CSSProperties = {
-  background: 'white',
-  borderRadius: '16px',
+const dialog: CSSProperties = {
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-lg)',
   width: '100%',
   maxWidth: '520px',
   maxHeight: '90vh',
@@ -513,60 +392,174 @@ const dialog: React.CSSProperties = {
   overflow: 'hidden',
 }
 
-const header: React.CSSProperties = {
+const dialogHeader: CSSProperties = {
   padding: '1rem 1.25rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--neon-border)',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
+  background: 'var(--bg-card)',
 }
 
-const closeBtn: React.CSSProperties = {
+const dialogTitle: CSSProperties = {
+  margin: 0,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 800,
+  fontSize: '1.25rem',
+  color: 'var(--text-primary)',
+  letterSpacing: '-0.01em',
+}
+
+const closeBtn: CSSProperties = {
   background: 'none',
   border: 'none',
   fontSize: '1.5rem',
   cursor: 'pointer',
-  color: '#6b7280',
+  color: 'var(--text-muted)',
+  lineHeight: 1,
+  padding: '0',
 }
 
-const input: React.CSSProperties = {
-  padding: '0.625rem',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
+const dialogBody: CSSProperties = {
+  flex: 1,
+  overflowY: 'auto',
+  padding: '1.25rem',
+}
+
+const dialogFooter: CSSProperties = {
+  padding: '1rem 1.25rem',
+  borderTop: '1px solid var(--neon-border)',
+  display: 'flex',
+  gap: '0.5rem',
+  background: 'var(--bg-card)',
+}
+
+const footerBtn: CSSProperties = { flex: 1 }
+
+const searchInput: CSSProperties = {
+  width: '100%',
+  padding: '0.625rem 0.875rem',
+  background: 'var(--bg-muted)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-sm)',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.875rem',
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+
+const selectedPile: CSSProperties = {
+  padding: '0.75rem',
+  background: 'var(--neon-dim)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-md)',
+}
+
+const selectedLabel: CSSProperties = {
+  margin: '0 0 0.5rem',
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.6rem',
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  color: 'var(--text-neon)',
+}
+
+const pillRow: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.375rem',
+}
+
+const selectedPill: CSSProperties = {
+  padding: '0.25rem 0.625rem',
+  background: 'var(--bg-card)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: '100px',
+  cursor: 'pointer',
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.75rem',
+  color: 'var(--neon)',
+}
+
+const groupLabel: CSSProperties = {
+  margin: '0 0 0.375rem',
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.6rem',
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  color: 'var(--text-muted)',
+}
+
+const frequentPill: CSSProperties = {
+  padding: '0.375rem 0.625rem',
+  background: 'var(--bg-muted)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: '100px',
+  cursor: 'pointer',
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.75rem',
+  color: 'var(--text-secondary)',
+}
+
+const aiPrompt: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '0.75rem',
+  padding: '1.5rem',
+  background: 'var(--bg-card)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-md)',
+}
+
+const aiPromptText: CSSProperties = {
+  margin: 0,
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.875rem',
+  color: 'var(--text-secondary)',
+  textAlign: 'center',
+}
+
+function exRow(isSelected: boolean): CSSProperties {
+  return {
+    width: '100%',
+    padding: '0.625rem 0.875rem',
+    background: isSelected ? 'var(--neon-dim)' : 'var(--bg-card)',
+    border: `1px solid ${isSelected ? 'var(--neon-border-md)' : 'var(--neon-border)'}`,
+    borderRadius: 'var(--radius-sm)',
+    cursor: isSelected ? 'default' : 'pointer',
+    textAlign: 'left',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  }
+}
+
+const metaLabel: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.25rem',
+}
+
+const metaLabelText: CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.62rem',
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  color: 'var(--text-muted)',
+}
+
+const metaInput: CSSProperties = {
+  padding: '0.5rem 0.625rem',
+  background: 'var(--bg-muted)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-sm)',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.875rem',
+  outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
-  fontSize: '0.875rem',
-}
-
-const smallInput: React.CSSProperties = {
-  padding: '0.4rem',
-  border: '1px solid #d1d5db',
-  borderRadius: '4px',
-  width: '60px',
-  fontSize: '0.75rem',
-}
-
-const th: React.CSSProperties = {
-  padding: '0.25rem',
-  textAlign: 'left',
-  fontSize: '0.625rem',
-  textTransform: 'uppercase',
-  color: '#9ca3af',
-  fontWeight: 600,
-}
-
-const td: React.CSSProperties = {
-  padding: '0.25rem',
-}
-
-const primaryBtn: React.CSSProperties = {
-  flex: 1,
-  padding: '0.75rem',
-  background: '#10b981',
-  color: 'white',
-  border: 'none',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  fontSize: '0.875rem',
-  fontWeight: 600,
+  colorScheme: 'dark',
 }

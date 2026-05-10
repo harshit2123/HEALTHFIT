@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { goalApi, type Goal, type GoalType } from '../../../lib/clientApi'
+import type { CSSProperties } from 'react'
 
-const GOAL_LABELS: Record<GoalType, { label: string; emoji: string; defaultUnit: string }> = {
-  LOSE_WEIGHT: { label: 'Lose weight', emoji: '⚖️', defaultUnit: 'kg' },
-  GAIN_MUSCLE: { label: 'Gain muscle', emoji: '💪', defaultUnit: 'kg' },
-  BUILD_ENDURANCE: { label: 'Build endurance', emoji: '🏃', defaultUnit: 'minutes' },
-  IMPROVE_FLEXIBILITY: { label: 'Improve flexibility', emoji: '🧘', defaultUnit: 'sessions' },
-  CUSTOM: { label: 'Custom goal', emoji: '🎯', defaultUnit: 'count' },
+const GOAL_LABELS: Record<GoalType, { label: string; icon: string; defaultUnit: string }> = {
+  LOSE_WEIGHT:         { label: 'Lose weight',         icon: '⚖', defaultUnit: 'kg' },
+  GAIN_MUSCLE:         { label: 'Gain muscle',          icon: '↑', defaultUnit: 'kg' },
+  BUILD_ENDURANCE:     { label: 'Build endurance',      icon: '◎', defaultUnit: 'minutes' },
+  IMPROVE_FLEXIBILITY: { label: 'Improve flexibility',  icon: '∿', defaultUnit: 'sessions' },
+  CUSTOM:              { label: 'Custom goal',          icon: '◈', defaultUnit: 'count' },
 }
 
 export function GoalsPage() {
@@ -27,67 +28,55 @@ export function GoalsPage() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['goals'] })
 
   return (
-    <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-      <header style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ margin: 0 }}>Goals</h1>
-        <p style={{ color: '#6b7280', margin: '0.25rem 0 0', fontSize: '0.875rem' }}>
-          Set targets. Track progress automatically.
-        </p>
+    <div style={pageWrap}>
+      <header style={pageHeader}>
+        <div>
+          <h1 style={heading}>Goals</h1>
+          <p style={sub}>Set targets. Track progress automatically.</p>
+        </div>
+        <button onClick={() => setCreateOpen(true)} className="sf-btn-primary" style={newGoalBtn}>
+          + New goal
+        </button>
       </header>
 
-      <button
-        onClick={() => setCreateOpen(true)}
-        style={{
-          width: '100%',
-          padding: '0.875rem',
-          background: '#10b981',
-          color: 'white',
-          border: 'none',
-          borderRadius: '12px',
-          cursor: 'pointer',
-          fontWeight: 600,
-          fontSize: '0.875rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        + Set new goal
-      </button>
-
       {active && active.length > 0 && (
-        <section style={{ marginBottom: '1.5rem' }}>
-          <h2 style={sectionHeading}>Active</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-            {active.map((g) => (
-              <GoalCard key={g.id} goal={g} onUpdate={refresh} />
-            ))}
+        <section style={{ marginBottom: '2rem' }}>
+          <p style={sectionLabel}>Active</p>
+          <div style={cardList}>
+            {active.map((g) => <GoalCard key={g.id} goal={g} onUpdate={refresh} />)}
           </div>
         </section>
       )}
 
       {(!active || active.length === 0) && (
-        <p style={{ color: '#9ca3af', textAlign: 'center', padding: '2rem 1rem', fontSize: '0.875rem' }}>
-          No active goals. Set your first.
-        </p>
+        <div style={emptyState}>
+          <span style={emptyIcon}>◈</span>
+          <p style={emptyText}>No active goals. Set your first target.</p>
+        </div>
       )}
 
       {completed && completed.length > 0 && (
         <section>
-          <h2 style={sectionHeading}>Completed</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-            {completed.map((g) => (
-              <GoalCard key={g.id} goal={g} onUpdate={refresh} />
-            ))}
+          <p style={sectionLabel}>Completed</p>
+          <div style={cardList}>
+            {completed.map((g) => <GoalCard key={g.id} goal={g} onUpdate={refresh} />)}
           </div>
         </section>
       )}
 
-      {createOpen && <CreateGoalDialog onClose={() => setCreateOpen(false)} onSuccess={() => { setCreateOpen(false); refresh() }} />}
+      {createOpen && (
+        <CreateGoalDialog
+          onClose={() => setCreateOpen(false)}
+          onSuccess={() => { setCreateOpen(false); refresh() }}
+        />
+      )}
     </div>
   )
 }
 
 function GoalCard({ goal, onUpdate }: { goal: Goal; onUpdate: () => void }) {
   const meta = GOAL_LABELS[goal.goalType]
+
   const { data: progress } = useQuery({
     queryKey: ['goal-progress', goal.id],
     queryFn: () => goalApi.getProgress(goal.id),
@@ -104,75 +93,63 @@ function GoalCard({ goal, onUpdate }: { goal: Goal; onUpdate: () => void }) {
     onSuccess: onUpdate,
   })
 
-  const paceColor =
-    progress?.pace === 'ahead' ? '#10b981' : progress?.pace === 'behind' ? '#dc2626' : '#6366f1'
+  const pct = Math.min(Math.max(progress?.percentComplete ?? 0, 0), 100)
+  const paceNeon = progress?.pace === 'ahead'
+  const paceDanger = progress?.pace === 'behind'
+  const barColor = paceNeon ? 'var(--neon)' : paceDanger ? 'var(--danger)' : 'rgba(255,255,255,0.5)'
+  const paceLabel = paceNeon ? '↑ ahead' : paceDanger ? '↓ behind' : 'on track'
 
   return (
-    <div style={{ padding: '1rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.625rem' }}>
+    <div style={cardWrap} className="sf-card">
+      <div style={cardTop}>
         <div>
-          <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem' }}>
-            {meta.emoji} {meta.label}
+          <p style={goalName}>
+            <span style={goalIcon}>{meta.icon}</span>
+            {meta.label}
           </p>
-          <p style={{ margin: '0.125rem 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>
+          <p style={goalRange}>
             {Number(goal.startingValue)} → {Number(goal.targetValue)} {goal.targetUnit}
           </p>
         </div>
         {goal.status === 'COMPLETED' && (
-          <span style={{ padding: '0.125rem 0.5rem', background: '#dcfce7', color: '#166534', borderRadius: '999px', fontSize: '0.625rem', fontWeight: 700 }}>
-            ✓ Completed
-          </span>
+          <span className="sf-badge-neon" style={{ fontSize: '0.6rem' }}>✓ Done</span>
         )}
       </div>
 
       {goal.status === 'ACTIVE' && progress && (
         <>
-          {/* Progress bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
-            <div style={{ flex: 1, height: '6px', background: '#f3f4f6', borderRadius: '999px', overflow: 'hidden' }}>
-              <div
-                style={{
-                  width: `${progress.percentComplete}%`,
-                  height: '100%',
-                  background: paceColor,
-                  transition: 'width 0.3s',
-                }}
-              />
+          <div style={progressRow}>
+            <div className="sf-progress-track" style={{ flex: 1 }}>
+              <div className="sf-progress-fill" style={{ width: `${pct}%`, background: barColor }} />
             </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: paceColor, minWidth: '40px', textAlign: 'right' }}>
-              {Math.round(progress.percentComplete)}%
-            </span>
+            <span style={{ ...pctLabel, color: barColor }}>{Math.round(pct)}%</span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.625rem', color: '#9ca3af' }}>
-            <span>
+          <div style={statsRow}>
+            <span style={statItem}>
               {progress.currentValue !== null ? `Now: ${progress.currentValue} ${goal.targetUnit}` : '—'}
             </span>
-            <span>{progress.daysRemaining} days left</span>
-            <span style={{ color: paceColor, fontWeight: 600 }}>
-              {progress.pace === 'ahead' ? '↑ ahead' : progress.pace === 'behind' ? '↓ behind' : 'on track'}
-            </span>
+            <span style={statItem}>{progress.daysRemaining}d left</span>
+            <span style={{ ...statItem, color: barColor, fontWeight: 700 }}>{paceLabel}</span>
           </div>
 
           {goal.reason && (
-            <p style={{ margin: '0.625rem 0 0', fontSize: '0.75rem', color: '#6b7280', fontStyle: 'italic' }}>
-              "{goal.reason}"
-            </p>
+            <p style={reasonText}>"{goal.reason}"</p>
           )}
 
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+          <div style={actionRow}>
             <button
               onClick={() => completeMutation.mutate()}
               disabled={completeMutation.isPending}
-              style={{ padding: '0.4rem 0.75rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}
+              className="sf-btn-primary"
+              style={completeBtn}
             >
               Mark complete
             </button>
             <button
-              onClick={() => {
-                if (confirm('Abandon this goal?')) abandonMutation.mutate()
-              }}
-              style={{ padding: '0.4rem 0.75rem', background: 'white', color: '#6b7280', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}
+              onClick={() => { if (confirm('Abandon this goal?')) abandonMutation.mutate() }}
+              className="sf-btn-ghost"
+              style={abandonBtn}
             >
               Abandon
             </button>
@@ -213,37 +190,30 @@ function CreateGoalDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
 
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={dialog} onClick={(e) => e.stopPropagation()}>
-        <header style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.125rem' }}>New goal</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280' }}>×</button>
+      <div style={dialogWrap} onClick={(e) => e.stopPropagation()} className="sf-animate-in">
+        <header style={dialogHeader}>
+          <h2 style={dialogTitle}>New goal</h2>
+          <button onClick={onClose} style={closeBtn}>×</button>
         </header>
 
-        <form onSubmit={submit} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={submit} style={formBody}>
           <Field label="Goal type">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.375rem' }}>
+            <div style={goalGrid}>
               {(Object.keys(GOAL_LABELS) as GoalType[]).map((k) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setGoalType(k)}
-                  style={{
-                    padding: '0.625rem 0.5rem',
-                    background: goalType === k ? '#ecfdf5' : 'white',
-                    border: goalType === k ? '2px solid #10b981' : '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                  }}
+                  style={goalTypeBtn(goalType === k)}
                 >
-                  {GOAL_LABELS[k].emoji} {GOAL_LABELS[k].label}
+                  <span style={goalTypeBtnIcon}>{GOAL_LABELS[k].icon}</span>
+                  <span>{GOAL_LABELS[k].label}</span>
                 </button>
               ))}
             </div>
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <Field label={`Starting (${meta.defaultUnit})`}>
               <input
                 type="number"
@@ -251,7 +221,7 @@ function CreateGoalDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
                 value={startingValue}
                 onChange={(e) => setStartingValue(e.target.value)}
                 required
-                style={input}
+                style={inputStyle}
               />
             </Field>
             <Field label={`Target (${meta.defaultUnit})`}>
@@ -261,13 +231,13 @@ function CreateGoalDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
                 value={targetValue}
                 onChange={(e) => setTargetValue(e.target.value)}
                 required
-                style={input}
+                style={inputStyle}
               />
             </Field>
           </div>
 
           <Field label="Timeline">
-            <select value={weeks} onChange={(e) => setWeeks(e.target.value)} style={input}>
+            <select value={weeks} onChange={(e) => setWeeks(e.target.value)} style={inputStyle}>
               <option value="4">4 weeks</option>
               <option value="8">8 weeks</option>
               <option value="12">12 weeks (3 months)</option>
@@ -281,17 +251,22 @@ function CreateGoalDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Wedding in March, feel better, etc."
-              style={input}
+              placeholder="Wedding in March, feel better…"
+              style={inputStyle}
             />
           </Field>
 
-          {mutation.isError && <p style={{ color: '#dc2626', margin: 0, fontSize: '0.875rem' }}>Failed to create goal</p>}
+          {mutation.isError && (
+            <p style={{ color: 'var(--danger)', margin: 0, fontSize: '0.8rem', fontFamily: 'var(--font-body)' }}>
+              Failed to create goal
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={mutation.isPending}
-            style={{ padding: '0.75rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+            className="sf-btn-primary"
+            style={{ width: '100%', padding: '0.75rem' }}
           >
             {mutation.isPending ? 'Creating…' : 'Set goal'}
           </button>
@@ -303,26 +278,161 @@ function CreateGoalDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-      <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151' }}>{label}</span>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+      <span style={fieldLabel}>{label}</span>
       {children}
     </label>
   )
 }
 
-const sectionHeading = {
-  margin: '0 0 0.625rem',
-  fontSize: '0.75rem',
-  textTransform: 'uppercase' as const,
-  color: '#9ca3af',
-  fontWeight: 600,
-  letterSpacing: '0.04em',
+// ─── styles ──────────────────────────────────────────────────────────────────
+
+const pageWrap: CSSProperties = { maxWidth: '720px', margin: '0 auto' }
+
+const pageHeader: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-end',
+  marginBottom: '2rem',
 }
 
-const overlay: React.CSSProperties = {
+const heading: CSSProperties = {
+  margin: 0,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 800,
+  fontSize: '2rem',
+  color: 'var(--text-primary)',
+  letterSpacing: '-0.02em',
+}
+
+const sub: CSSProperties = {
+  margin: '0.25rem 0 0',
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.8rem',
+  color: 'var(--text-muted)',
+}
+
+const newGoalBtn: CSSProperties = { padding: '0.6rem 1.25rem', flexShrink: 0 }
+
+const sectionLabel: CSSProperties = {
+  margin: '0 0 0.75rem',
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.62rem',
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+  color: 'var(--text-muted)',
+}
+
+const cardList: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
+
+const emptyState: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '0.75rem',
+  padding: '3rem 1rem',
+  textAlign: 'center',
+}
+
+const emptyIcon: CSSProperties = {
+  fontSize: '2rem',
+  color: 'var(--text-muted)',
+  opacity: 0.4,
+}
+
+const emptyText: CSSProperties = {
+  margin: 0,
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.875rem',
+  color: 'var(--text-muted)',
+}
+
+const cardWrap: CSSProperties = { padding: '1.25rem' }
+
+const cardTop: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: '1rem',
+}
+
+const goalName: CSSProperties = {
+  margin: 0,
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  fontFamily: 'var(--font-display)',
+  fontWeight: 700,
+  fontSize: '1.1rem',
+  color: 'var(--text-primary)',
+  letterSpacing: '-0.01em',
+}
+
+const goalIcon: CSSProperties = {
+  color: 'var(--neon)',
+  fontFamily: 'var(--font-mono)',
+}
+
+const goalRange: CSSProperties = {
+  margin: '0.25rem 0 0',
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.72rem',
+  color: 'var(--text-muted)',
+}
+
+const progressRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  marginBottom: '0.5rem',
+}
+
+const pctLabel: CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  minWidth: '36px',
+  textAlign: 'right',
+}
+
+const statsRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  marginBottom: '0.5rem',
+}
+
+const statItem: CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.62rem',
+  color: 'var(--text-muted)',
+}
+
+const reasonText: CSSProperties = {
+  margin: '0.625rem 0 0',
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.8rem',
+  color: 'var(--text-secondary)',
+  fontStyle: 'italic',
+}
+
+const actionRow: CSSProperties = {
+  display: 'flex',
+  gap: '0.5rem',
+  marginTop: '1rem',
+}
+
+const completeBtn: CSSProperties = { padding: '0.5rem 1rem', fontSize: '0.8rem' }
+
+const abandonBtn: CSSProperties = {
+  padding: '0.5rem 1rem',
+  fontSize: '0.8rem',
+  color: 'var(--text-muted)',
+}
+
+const overlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: 'rgba(0,0,0,0.4)',
+  background: 'rgba(0,0,0,0.7)',
   zIndex: 50,
   display: 'flex',
   alignItems: 'center',
@@ -330,20 +440,97 @@ const overlay: React.CSSProperties = {
   padding: '1rem',
 }
 
-const dialog: React.CSSProperties = {
-  background: 'white',
-  borderRadius: '16px',
+const dialogWrap: CSSProperties = {
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-xl)',
   width: '100%',
   maxWidth: '440px',
   maxHeight: '90vh',
   overflow: 'auto',
 }
 
-const input: React.CSSProperties = {
-  padding: '0.625rem',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
+const dialogHeader: CSSProperties = {
+  padding: '1.25rem 1.5rem',
+  borderBottom: '1px solid var(--neon-border)',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+}
+
+const dialogTitle: CSSProperties = {
+  margin: 0,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 800,
+  fontSize: '1.25rem',
+  color: 'var(--text-primary)',
+  letterSpacing: '-0.01em',
+}
+
+const closeBtn: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  fontSize: '1.5rem',
+  cursor: 'pointer',
+  color: 'var(--text-muted)',
+  lineHeight: 1,
+  padding: '0.25rem',
+}
+
+const formBody: CSSProperties = {
+  padding: '1.5rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+}
+
+const goalGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
+  gap: '0.5rem',
+}
+
+const goalTypeBtn = (active: boolean): CSSProperties => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  padding: '0.625rem 0.75rem',
+  background: active ? 'var(--neon-dim)' : 'var(--bg-muted)',
+  border: active ? '1px solid var(--neon)' : '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  color: active ? 'var(--neon)' : 'var(--text-secondary)',
+  textAlign: 'left',
+  transition: 'all 0.15s',
+})
+
+const goalTypeBtnIcon: CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  color: 'var(--neon)',
+  opacity: 0.8,
+}
+
+const fieldLabel: CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.62rem',
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  color: 'var(--text-muted)',
+}
+
+const inputStyle: CSSProperties = {
+  padding: '0.625rem 0.875rem',
+  background: 'var(--bg-muted)',
+  border: '1px solid var(--neon-border)',
+  borderRadius: 'var(--radius-sm)',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-body)',
+  fontSize: '0.875rem',
+  outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
-  fontSize: '0.875rem',
+  colorScheme: 'dark',
 }

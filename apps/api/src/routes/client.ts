@@ -58,6 +58,7 @@ import {
   suggestRoutineFromHistory,
 } from '../services/workoutService.js'
 import { isAIConfigured, getActiveProvider, getProviderStatus } from '../services/ai/calorieEstimator.js'
+import { getDietSuggestions } from '../services/dietSuggestionService.js'
 
 export const clientRouter = Router()
 
@@ -875,6 +876,15 @@ clientRouter.get('/analytics', async (req, res, next) => {
       getWorkoutHeatmap(req.user!.userId, 12),
     ])
     res.json({ success: true, data: { activity, insights, heatmap }, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/diet-suggestions', async (req, res, next) => {
+  try {
+    const suggestions = await getDietSuggestions(req.user!.userId)
+    res.json({ success: true, data: suggestions, error: null })
   } catch (err) {
     next(err)
   }

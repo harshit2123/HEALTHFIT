@@ -18,7 +18,8 @@
       "Bash(*)",
       "Read(**)",
       "Write(**)",
-      "Edit(**)"
+      "Edit(**)",
+      "WebFetch(domain:api.github.com)"
     ],
     "deny": [
       "Bash(rm -rf /)",

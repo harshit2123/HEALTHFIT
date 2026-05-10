@@ -242,6 +242,20 @@ export const calorieApi = {
     const res = await api.get('/client/foods/ai-status')
     return res.data.data
   },
+
+  getDietSuggestions: async (): Promise<NutrientGap[]> => {
+    const res = await api.get('/client/diet-suggestions')
+    return res.data.data
+  },
+}
+
+export interface NutrientGap {
+  nutrient: string
+  unit: string
+  current: number
+  target: number
+  foods: string[]
+  priority: 'HIGH' | 'MEDIUM' | 'LOW'
 }
 
 // =====================================================
