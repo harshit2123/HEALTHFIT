@@ -8,7 +8,7 @@ import { masterRouter } from './routes/master.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { authenticate } from './middleware/authenticate.js'
 import { requireRole } from './middleware/requireRole.js'
-import { authLimiter, apiLimiter } from './middleware/rateLimits.js'
+import { authLimiter, refreshLimiter, logoutLimiter, apiLimiter } from './middleware/rateLimits.js'
 import { startExpiryJob } from './services/expiryJob.js'
 import { prisma } from './lib/prisma.js'
 
@@ -19,7 +19,6 @@ const isProduction = process.env['NODE_ENV'] === 'production'
 // Security headers — helmet defaults are sane
 app.use(
   helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: isProduction
       ? {
           directives: {
@@ -59,8 +58,12 @@ app.get('/api/health', async (_req, res) => {
   }
 })
 
-// Public routes — auth-specific rate limit
-app.use('/api/auth', authLimiter, authRouter)
+// Public routes — per-endpoint rate limits
+app.use('/api/auth/login', authLimiter)
+app.use('/api/auth/register', authLimiter)
+app.use('/api/auth/refresh', refreshLimiter)
+app.use('/api/auth/logout', logoutLimiter)
+app.use('/api/auth', authRouter)
 
 // Protected routes — auth, role gate, then per-user rate limit
 app.use(

@@ -62,6 +62,7 @@ export const adminApi = {
     name: string
     phone?: string
     age?: number
+    gender?: string
     heightCm?: number
     currentWeightKg?: number
     fitnessLevel?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'

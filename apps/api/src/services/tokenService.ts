@@ -29,20 +29,29 @@ export async function issueRefreshToken(userId: string): Promise<string> {
 }
 
 export async function rotateRefreshToken(oldToken: string): Promise<{ userId: string; newToken: string }> {
-  const stored = await prisma.refreshToken.findUnique({ where: { token: oldToken } })
+  return prisma.$transaction(async (tx) => {
+    const stored = await tx.refreshToken.findUnique({ where: { token: oldToken } })
 
-  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-    throw new Error('Invalid or expired refresh token')
-  }
+    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+      throw new Error('Invalid or expired refresh token')
+    }
 
-  // Revoke old token (single-use refresh tokens)
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date() },
+    // Atomic revoke — if concurrent request already revoked this token, update returns nothing
+    const revoked = await tx.refreshToken.updateMany({
+      where: { id: stored.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    if (revoked.count === 0) {
+      throw new Error('Invalid or expired refresh token')
+    }
+
+    const newTokenValue = crypto.randomBytes(48).toString('hex')
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + 7)
+    await tx.refreshToken.create({ data: { userId: stored.userId, token: newTokenValue, expiresAt } })
+
+    return { userId: stored.userId, newToken: newTokenValue }
   })
-
-  const newToken = await issueRefreshToken(stored.userId)
-  return { userId: stored.userId, newToken }
 }
 
 export async function revokeRefreshToken(token: string): Promise<void> {

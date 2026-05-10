@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireOrgScope } from '../middleware/orgScope.js'
 import { requireRole } from '../middleware/requireRole.js'
+import { parseDate, parsePositiveInt } from '../lib/validation.js'
 import {
   createMember,
   listMembers,
@@ -229,7 +230,7 @@ adminRouter.post('/trainers/:trainerId/members/:memberId', requireRole(['ORG_OWN
 
 adminRouter.delete('/trainers/:trainerId/members/:memberId', requireRole(['ORG_OWNER']), async (req, res, next) => {
   try {
-    await unassignMember(req.params['trainerId']!, req.params['memberId']!)
+    await unassignMember(req.params['trainerId']!, req.params['memberId']!, req.user!.orgId!)
     res.json({ success: true, data: null, error: null })
   } catch (err) {
     next(err)
@@ -241,7 +242,11 @@ adminRouter.delete('/trainers/:trainerId/members/:memberId', requireRole(['ORG_O
 adminRouter.get('/conversions', requireRole(['ORG_OWNER']), async (req, res, next) => {
   try {
     const sinceParam = typeof req.query['since'] === 'string' ? req.query['since'] : undefined
-    const since = sinceParam ? new Date(sinceParam) : undefined
+    if (sinceParam && !parseDate(sinceParam)) {
+      res.status(400).json({ success: false, data: null, error: 'Invalid since date format' })
+      return
+    }
+    const since = sinceParam ? parseDate(sinceParam)! : undefined
     const result = await getConversionLeaderboard(req.user!.orgId!, { since })
     res.json({ success: true, data: result, error: null })
   } catch (err) {
@@ -418,7 +423,7 @@ adminRouter.get('/member-subscriptions', async (req, res, next) => {
   try {
     const status = req.query['status']
     const expiringWithinDays = req.query['expiringWithinDays']
-      ? Number(req.query['expiringWithinDays'])
+      ? parsePositiveInt(req.query['expiringWithinDays'] as string, 0, 365) || undefined
       : undefined
 
     const subs = await listOrgSubscriptions(req.user!.orgId!, {

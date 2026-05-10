@@ -31,41 +31,40 @@ function daysBetween(a: string, b: string): number {
  * Idempotent: multiple logs same day don't double-increment.
  */
 export async function bumpStreak(userId: string): Promise<{ streakDays: number }> {
-  const profile = await prisma.userProfile.findUnique({ where: { userId } })
-  if (!profile) return { streakDays: 0 }
+  // Wrap in transaction to prevent concurrent log events double-incrementing
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.userProfile.findUnique({ where: { userId } })
+    if (!profile) return { streakDays: 0 }
 
-  const tz = profile.timezone || 'Asia/Kolkata'
-  const today = ymd(new Date(), tz)
-  const lastDay = profile.streakLastDate ? ymd(profile.streakLastDate, tz) : null
+    const tz = profile.timezone || 'Asia/Kolkata'
+    const today = ymd(new Date(), tz)
+    const lastDay = profile.streakLastDate ? ymd(profile.streakLastDate, tz) : null
 
-  if (lastDay === today) {
-    // Already logged today, no change
-    return { streakDays: profile.streakDays }
-  }
-
-  let newStreak: number
-  if (!lastDay) {
-    newStreak = 1
-  } else {
-    const gap = daysBetween(lastDay, today)
-    if (gap === 1) {
-      newStreak = profile.streakDays + 1
-    } else if (gap > 1) {
-      newStreak = 1 // missed days, restart
-    } else {
-      newStreak = profile.streakDays // shouldn't happen
+    if (lastDay === today) {
+      return { streakDays: profile.streakDays }
     }
-  }
 
-  await prisma.userProfile.update({
-    where: { userId },
-    data: {
-      streakDays: newStreak,
-      streakLastDate: new Date(),
-    },
+    let newStreak: number
+    if (!lastDay) {
+      newStreak = 1
+    } else {
+      const gap = daysBetween(lastDay, today)
+      if (gap === 1) {
+        newStreak = profile.streakDays + 1
+      } else if (gap > 1) {
+        newStreak = 1
+      } else {
+        newStreak = profile.streakDays
+      }
+    }
+
+    await tx.userProfile.update({
+      where: { userId },
+      data: { streakDays: newStreak, streakLastDate: new Date() },
+    })
+
+    return { streakDays: newStreak }
   })
-
-  return { streakDays: newStreak }
 }
 
 export async function getStreak(userId: string): Promise<{

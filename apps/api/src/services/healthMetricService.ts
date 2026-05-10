@@ -14,36 +14,38 @@ export interface LogHealthMetricInput {
  * Also updates profile.currentWeightKg so calorie targets recalibrate.
  */
 export async function logHealthMetric(userId: string, orgId: string | null, input: LogHealthMetricInput) {
-  const profile = await prisma.userProfile.findUnique({ where: { userId } })
-  let bmi: number | null = null
-  if (input.weightKg && profile?.heightCm) {
-    const heightM = Number(profile.heightCm) / 100
-    bmi = Number((input.weightKg / (heightM * heightM)).toFixed(2))
-  }
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.userProfile.findUnique({ where: { userId } })
+    let bmi: number | null = null
+    if (input.weightKg && profile?.heightCm) {
+      const heightM = Number(profile.heightCm) / 100
+      bmi = Number((input.weightKg / (heightM * heightM)).toFixed(2))
+    }
 
-  const metric = await prisma.healthMetric.create({
-    data: {
-      userId,
-      orgId,
-      metricDate: input.metricDate ?? new Date(),
-      weightKg: input.weightKg,
-      bmi,
-      chestCm: input.chestCm,
-      waistCm: input.waistCm,
-      hipsCm: input.hipsCm,
-      notes: input.notes,
-    },
-  })
-
-  // Sync current weight to profile (drives goal progress + calorie target)
-  if (input.weightKg && profile) {
-    await prisma.userProfile.update({
-      where: { userId },
-      data: { currentWeightKg: input.weightKg },
+    const metric = await tx.healthMetric.create({
+      data: {
+        userId,
+        orgId,
+        metricDate: input.metricDate ?? new Date(),
+        weightKg: input.weightKg,
+        bmi,
+        chestCm: input.chestCm,
+        waistCm: input.waistCm,
+        hipsCm: input.hipsCm,
+        notes: input.notes,
+      },
     })
-  }
 
-  return metric
+    // Sync current weight to profile (atomic with metric create — drives calorie targets)
+    if (input.weightKg && profile) {
+      await tx.userProfile.update({
+        where: { userId },
+        data: { currentWeightKg: input.weightKg },
+      })
+    }
+
+    return metric
+  })
 }
 
 export async function deleteHealthMetric(metricId: string, userId: string) {

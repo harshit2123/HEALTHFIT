@@ -1,7 +1,17 @@
+import { z } from 'zod'
 import type { User, UserRole, AccountType } from '@spacefit/shared'
 
 const TOKEN_KEY = 'spacefit_token'
 const USER_KEY = 'spacefit_user'
+
+const userSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+  name: z.string(),
+  role: z.enum(['MASTER_ADMIN', 'ORG_OWNER', 'TRAINER', 'ORG_MEMBER', 'INDIVIDUAL_USER']),
+  accountType: z.enum(['B2B', 'B2C']),
+  orgId: z.string().nullable().optional(),
+})
 
 export function saveSession(token: string, user: User) {
   localStorage.setItem(TOKEN_KEY, token)
@@ -16,8 +26,14 @@ export function getUser(): User | null {
   const raw = localStorage.getItem(USER_KEY)
   if (!raw) return null
   try {
-    return JSON.parse(raw) as User
+    const parsed = userSchema.safeParse(JSON.parse(raw))
+    if (!parsed.success) {
+      clearSession()
+      return null
+    }
+    return parsed.data as User
   } catch {
+    clearSession()
     return null
   }
 }

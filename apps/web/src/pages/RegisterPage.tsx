@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { authApi, persistAuth } from '../lib/api'
@@ -101,6 +101,11 @@ function RegisterB2CFlow({ onBack }: { onBack: () => void }) {
   const [account, setAccount] = useState({ name: '', email: '', password: '', phone: '' })
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => { if (redirectTimer.current) clearTimeout(redirectTimer.current) }
+  }, [])
 
   async function submit() {
     setError(null)
@@ -119,7 +124,7 @@ function RegisterB2CFlow({ onBack }: { onBack: () => void }) {
       persistAuth(result)
       login(result.accessToken, result.user)
       setStep(4)
-      setTimeout(() => navigate(getPortalPath(result.user.role)), 1500)
+      redirectTimer.current = setTimeout(() => navigate(getPortalPath(result.user.role)), 1500)
     } catch (err) {
       setError(extractErrorMessage(err))
       setLoading(false)

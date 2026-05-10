@@ -112,70 +112,53 @@ export async function assignOrRenewSubscription(
   planId: string,
   amountPaidInr: number
 ) {
-  // Verify member is in this org
-  const member = await prisma.user.findFirst({
-    where: { id: memberId, orgId, role: 'ORG_MEMBER' },
-  })
-  if (!member) throw new Error('Member not found in org')
+  return prisma.$transaction(async (tx) => {
+    const member = await tx.user.findFirst({ where: { id: memberId, orgId, role: 'ORG_MEMBER' } })
+    if (!member) throw new Error('Member not found in org')
 
-  const plan = await prisma.subscriptionPlan.findFirst({
-    where: { id: planId, orgId, isActive: true },
-  })
-  if (!plan) throw new Error('Plan not found or archived')
+    const plan = await tx.subscriptionPlan.findFirst({ where: { id: planId, orgId, isActive: true } })
+    if (!plan) throw new Error('Plan not found or archived')
 
-  // Check capacity if set
-  if (plan.memberCapacity !== null) {
-    const activeCount = await prisma.memberSubscription.count({
-      where: {
-        planId,
-        status: { in: ['ACTIVE', 'EXPIRING'] },
-      },
-    })
-    if (activeCount >= plan.memberCapacity) {
-      throw new Error('Plan member capacity reached')
+    // Atomic capacity check inside transaction — no TOCTOU race window
+    if (plan.memberCapacity !== null) {
+      const activeCount = await tx.memberSubscription.count({
+        where: { planId, status: { in: ['ACTIVE', 'EXPIRING'] } },
+      })
+      if (activeCount >= plan.memberCapacity) {
+        throw new Error('Plan member capacity reached')
+      }
     }
-  }
 
-  const now = new Date()
-  const existing = await prisma.memberSubscription.findUnique({ where: { memberId } })
+    const now = new Date()
+    const existing = await tx.memberSubscription.findUnique({ where: { memberId } })
 
-  // Calculate new expiry
-  let newExpiresAt: Date
-  if (existing && existing.expiresAt > now && existing.status !== 'CANCELLED') {
-    // Extend from current expiry
-    newExpiresAt = new Date(existing.expiresAt)
-    newExpiresAt.setDate(newExpiresAt.getDate() + plan.durationDays)
-  } else {
-    // Start fresh
-    newExpiresAt = new Date(now)
-    newExpiresAt.setDate(newExpiresAt.getDate() + plan.durationDays)
-  }
+    let newExpiresAt: Date
+    if (existing && existing.expiresAt > now && existing.status !== 'CANCELLED') {
+      newExpiresAt = new Date(existing.expiresAt)
+      newExpiresAt.setDate(newExpiresAt.getDate() + plan.durationDays)
+    } else {
+      newExpiresAt = new Date(now)
+      newExpiresAt.setDate(newExpiresAt.getDate() + plan.durationDays)
+    }
 
-  if (existing) {
-    return prisma.memberSubscription.update({
-      where: { memberId },
-      data: {
-        planId,
-        startedAt: existing.expiresAt > now ? existing.startedAt : now,
-        expiresAt: newExpiresAt,
-        status: 'ACTIVE',
-        amountPaidInr: { increment: amountPaidInr },
-      },
+    if (existing) {
+      return tx.memberSubscription.update({
+        where: { memberId },
+        data: {
+          planId,
+          startedAt: existing.expiresAt > now ? existing.startedAt : now,
+          expiresAt: newExpiresAt,
+          status: 'ACTIVE',
+          amountPaidInr: { increment: amountPaidInr },
+        },
+        include: { plan: true },
+      })
+    }
+
+    return tx.memberSubscription.create({
+      data: { memberId, orgId, planId, startedAt: now, expiresAt: newExpiresAt, status: 'ACTIVE', amountPaidInr },
       include: { plan: true },
     })
-  }
-
-  return prisma.memberSubscription.create({
-    data: {
-      memberId,
-      orgId,
-      planId,
-      startedAt: now,
-      expiresAt: newExpiresAt,
-      status: 'ACTIVE',
-      amountPaidInr,
-    },
-    include: { plan: true },
   })
 }
 

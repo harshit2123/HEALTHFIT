@@ -99,8 +99,13 @@ authRouter.post('/refresh', async (req, res, next) => {
 
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, role: true, accountType: true, orgId: true },
+      select: { id: true, role: true, accountType: true, orgId: true, isActive: true },
     })
+
+    if (!user.isActive) {
+      res.status(401).json({ success: false, data: null, error: 'Account suspended' })
+      return
+    }
 
     const accessToken = signAccessToken({
       userId: user.id,
@@ -136,9 +141,7 @@ authRouter.post('/logout', async (req, res, next) => {
   }
 })
 
-// GET /api/auth/me — Get current user info from token
-authRouter.get('/me', async (_req, res) => {
-  // This endpoint will be hit AFTER auth middleware in real usage
-  // For now, return placeholder. Real implementation in Phase 2.
-  res.json({ success: true, data: null, error: 'Use /api/admin or /api/client routes for authenticated requests' })
+// GET /api/auth/me — not implemented; use portal-specific profile routes
+authRouter.get('/me', (_req, res) => {
+  res.status(501).json({ success: false, data: null, error: 'Not implemented. Use /api/client/me or /api/admin/me.' })
 })

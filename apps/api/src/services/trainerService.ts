@@ -83,9 +83,9 @@ export async function assignMemberToTrainer(
   })
 }
 
-export async function unassignMember(trainerId: string, memberId: string) {
+export async function unassignMember(trainerId: string, memberId: string, orgId: string) {
   return prisma.trainerAssignment.updateMany({
-    where: { trainerId, memberId, isActive: true },
+    where: { trainerId, memberId, orgId, isActive: true },
     data: { isActive: false },
   })
 }

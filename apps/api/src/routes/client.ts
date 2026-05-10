@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getMyProfile, updateMyProfile, getMySubscription } from '../services/clientService.js'
 import { upgradeToPremium, cancelPremium } from '../services/subscriptionService.js'
 import { requireRole } from '../middleware/requireRole.js'
+import { parseDate, parsePositiveInt } from '../lib/validation.js'
 import {
   searchFoods,
   listCategories,
@@ -222,7 +223,9 @@ clientRouter.get('/workouts', async (req, res, next) => {
   try {
     const dateStr = typeof req.query['date'] === 'string' ? req.query['date'] : undefined
     if (dateStr) {
-      const list = await getWorkoutsForDay(req.user!.userId, new Date(dateStr))
+      const parsed = parseDate(dateStr)
+      if (!parsed) { res.status(400).json({ success: false, data: null, error: 'Invalid date format' }); return }
+      const list = await getWorkoutsForDay(req.user!.userId, parsed)
       res.json({ success: true, data: list, error: null })
       return
     }
@@ -477,8 +480,9 @@ clientRouter.post('/calories', async (req, res, next) => {
 clientRouter.get('/calories', async (req, res, next) => {
   try {
     const dateStr = typeof req.query['date'] === 'string' ? req.query['date'] : undefined
-    const date = dateStr ? new Date(dateStr) : new Date()
-    const result = await getDailyBreakdown(req.user!.userId, date)
+    const date = dateStr ? parseDate(dateStr) : new Date()
+    if (dateStr && !date) { res.status(400).json({ success: false, data: null, error: 'Invalid date format' }); return }
+    const result = await getDailyBreakdown(req.user!.userId, date!)
     res.json({ success: true, data: result, error: null })
   } catch (err) {
     next(err)
@@ -493,7 +497,10 @@ clientRouter.get('/calories/range', async (req, res, next) => {
       res.status(400).json({ success: false, data: null, error: 'start and end query params required' })
       return
     }
-    const totals = await getDailyTotals(req.user!.userId, new Date(startStr), new Date(endStr))
+    const start = parseDate(startStr)
+    const end = parseDate(endStr)
+    if (!start || !end) { res.status(400).json({ success: false, data: null, error: 'Invalid date format' }); return }
+    const totals = await getDailyTotals(req.user!.userId, start, end)
     res.json({ success: true, data: totals, error: null })
   } catch (err) {
     next(err)
@@ -838,7 +845,7 @@ clientRouter.delete('/health-metrics/:id', async (req, res, next) => {
 
 clientRouter.get('/health-metrics/weight-history', async (req, res, next) => {
   try {
-    const days = req.query['days'] ? Number(req.query['days']) : 90
+    const days = parsePositiveInt(req.query['days'] as string | undefined, 90, 365)
     const history = await getWeightHistory(req.user!.userId, days)
     res.json({ success: true, data: history, error: null })
   } catch (err) {
@@ -861,7 +868,7 @@ clientRouter.get('/health-metrics/latest', async (req, res, next) => {
 
 clientRouter.get('/analytics', async (req, res, next) => {
   try {
-    const days = req.query['days'] ? Number(req.query['days']) : 30
+    const days = parsePositiveInt(req.query['days'] as string | undefined, 30, 365)
     const [activity, insights, heatmap] = await Promise.all([
       getDailyActivityRange(req.user!.userId, days),
       getInsights(req.user!.userId),

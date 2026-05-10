@@ -30,13 +30,10 @@ export function CaloriesPage() {
   useEffect(() => {
     const logFoodId = searchParams.get('logFoodId')
     if (logFoodId) {
-      setLogDialog('SNACKS') // default meal — user can change in dialog
-      // We'd ideally pre-populate the dialog with foodId, but minimum-friction:
-      // open SNACKS dialog and clear URL
+      setLogDialog('SNACKS')
       setSearchParams({}, { replace: true })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [searchParams, setLogDialog, setSearchParams])
 
   const { data: daily, isLoading } = useQuery({
     queryKey: ['calories', date],
@@ -201,10 +198,11 @@ export function CaloriesPage() {
                             Edit
                           </button>
                           <button
-                            onClick={async () => {
+                            onClick={() => {
                               if (confirm('Delete this entry?')) {
-                                await calorieApi.deleteLog(log.id)
-                                refresh()
+                                calorieApi.deleteLog(log.id)
+                                  .then(() => refresh())
+                                  .catch(() => alert('Failed to delete. Please try again.'))
                               }
                             }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '1rem' }}

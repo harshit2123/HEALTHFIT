@@ -5,9 +5,12 @@ import rateLimit from 'express-rate-limit'
  * In-memory store — fine for single-instance dev. Switch to Redis in Phase 9 for horizontal scale.
  */
 
+const AUTH_WINDOW_MS = 15 * 60 * 1000
+const REFRESH_WINDOW_MS = 15 * 60 * 1000
+
 // Auth: 5 attempts per 15 minutes per IP. Login + register only.
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: AUTH_WINDOW_MS,
   max: 5,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
@@ -16,8 +19,28 @@ export const authLimiter = rateLimit({
     data: null,
     error: 'Too many attempts. Try again in 15 minutes.',
   },
-  // Skip rate limit for refresh endpoint (legitimate frequent calls)
-  skip: (req) => req.path === '/refresh' || req.path === '/logout',
+})
+
+// Refresh: 30 attempts per 15 minutes per IP — allows normal usage, blocks brute force.
+export const refreshLimiter = rateLimit({
+  windowMs: REFRESH_WINDOW_MS,
+  max: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    data: null,
+    error: 'Too many refresh attempts. Try again later.',
+  },
+})
+
+// Logout: basic flood protection
+export const logoutLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, data: null, error: 'Too many logout attempts.' },
 })
 
 // AI: 30 calls per minute per user (handles bulk parses + lookups).

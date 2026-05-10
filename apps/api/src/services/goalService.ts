@@ -14,24 +14,26 @@ export interface CreateGoalInput {
 }
 
 export async function createGoal(userId: string, orgId: string | null, input: CreateGoalInput) {
-  // Auto-deactivate any existing ACTIVE goal of same type — one active per type
-  await prisma.goal.updateMany({
-    where: { userId, goalType: input.goalType, status: 'ACTIVE' },
-    data: { status: 'PAUSED' },
-  })
+  return prisma.$transaction(async (tx) => {
+    // Atomic: deactivate existing + create new in same transaction — no race window
+    await tx.goal.updateMany({
+      where: { userId, goalType: input.goalType, status: 'ACTIVE' },
+      data: { status: 'PAUSED' },
+    })
 
-  return prisma.goal.create({
-    data: {
-      userId,
-      orgId,
-      goalType: input.goalType,
-      targetValue: input.targetValue,
-      targetUnit: input.targetUnit,
-      startingValue: input.startingValue,
-      targetDate: input.targetDate,
-      reason: input.reason,
-      status: 'ACTIVE',
-    },
+    return tx.goal.create({
+      data: {
+        userId,
+        orgId,
+        goalType: input.goalType,
+        targetValue: input.targetValue,
+        targetUnit: input.targetUnit,
+        startingValue: input.startingValue,
+        targetDate: input.targetDate,
+        reason: input.reason,
+        status: 'ACTIVE',
+      },
+    })
   })
 }
 
