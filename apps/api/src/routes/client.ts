@@ -19,6 +19,26 @@ import {
 } from '../services/calorieService.js'
 import { getStreak } from '../services/streakService.js'
 import {
+  createGoal,
+  listGoals,
+  getGoal,
+  updateGoal,
+  deleteGoal,
+  getGoalProgress,
+  getGoalAdjustedTarget,
+} from '../services/goalService.js'
+import {
+  logHealthMetric,
+  deleteHealthMetric,
+  getWeightHistory,
+  getLatestMetric,
+} from '../services/healthMetricService.js'
+import {
+  getDailyActivityRange,
+  getInsights,
+  getWorkoutHeatmap,
+} from '../services/analyticsService.js'
+import {
   searchExercises,
   getExercise,
   createCustomExercise,
@@ -652,14 +672,203 @@ clientRouter.post('/foods', async (req, res, next) => {
   }
 })
 
-clientRouter.post('/goals', (_req, res) => {
-  res.json({ success: true, data: { message: 'Create goal — Phase 7' }, error: null })
+// =====================================================
+// GOALS
+// =====================================================
+
+const createGoalSchema = z.object({
+  goalType: z.enum(['LOSE_WEIGHT', 'GAIN_MUSCLE', 'BUILD_ENDURANCE', 'IMPROVE_FLEXIBILITY', 'CUSTOM']),
+  targetValue: z.number(),
+  targetUnit: z.string().min(1),
+  startingValue: z.number(),
+  targetDate: z.string().datetime(),
+  reason: z.string().optional(),
 })
 
-clientRouter.get('/goals', (_req, res) => {
-  res.json({ success: true, data: { message: 'Goals list — Phase 7' }, error: null })
+clientRouter.post('/goals', async (req, res, next) => {
+  try {
+    const parsed = createGoalSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, data: null, error: parsed.error.flatten() })
+      return
+    }
+    const goal = await createGoal(req.user!.userId, req.user!.orgId, {
+      ...parsed.data,
+      targetDate: new Date(parsed.data.targetDate),
+    })
+    res.status(201).json({ success: true, data: goal, error: null })
+  } catch (err) {
+    next(err)
+  }
 })
 
-clientRouter.get('/analytics', (_req, res) => {
-  res.json({ success: true, data: { message: 'Health analytics — Phase 7' }, error: null })
+clientRouter.get('/goals', async (req, res, next) => {
+  try {
+    const status = req.query['status']
+    const goals = await listGoals(
+      req.user!.userId,
+      status === 'ACTIVE' || status === 'PAUSED' || status === 'COMPLETED' || status === 'ABANDONED'
+        ? status
+        : undefined
+    )
+    res.json({ success: true, data: goals, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/goals/active-target', async (req, res, next) => {
+  try {
+    const result = await getGoalAdjustedTarget(req.user!.userId)
+    res.json({ success: true, data: result, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/goals/:id', async (req, res, next) => {
+  try {
+    const goal = await getGoal(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: goal, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Goal not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+clientRouter.get('/goals/:id/progress', async (req, res, next) => {
+  try {
+    const progress = await getGoalProgress(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: progress, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Goal not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+const updateGoalSchema = z.object({
+  status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'ABANDONED']).optional(),
+  targetValue: z.number().optional(),
+  targetDate: z.string().datetime().optional(),
+  reason: z.string().optional(),
+})
+
+clientRouter.patch('/goals/:id', async (req, res, next) => {
+  try {
+    const parsed = updateGoalSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, data: null, error: parsed.error.flatten() })
+      return
+    }
+    const goal = await updateGoal(req.params['id']!, req.user!.userId, {
+      ...parsed.data,
+      targetDate: parsed.data.targetDate ? new Date(parsed.data.targetDate) : undefined,
+    })
+    res.json({ success: true, data: goal, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Goal not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+clientRouter.delete('/goals/:id', async (req, res, next) => {
+  try {
+    await deleteGoal(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: null, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Goal not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+// =====================================================
+// HEALTH METRICS (weight + measurements)
+// =====================================================
+
+const logMetricSchema = z.object({
+  metricDate: z.string().datetime().optional(),
+  weightKg: z.number().min(20).max(500).optional(),
+  chestCm: z.number().min(30).max(200).optional(),
+  waistCm: z.number().min(30).max(200).optional(),
+  hipsCm: z.number().min(30).max(200).optional(),
+  notes: z.string().optional(),
+})
+
+clientRouter.post('/health-metrics', async (req, res, next) => {
+  try {
+    const parsed = logMetricSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, data: null, error: parsed.error.flatten() })
+      return
+    }
+    const m = await logHealthMetric(req.user!.userId, req.user!.orgId, {
+      ...parsed.data,
+      metricDate: parsed.data.metricDate ? new Date(parsed.data.metricDate) : undefined,
+    })
+    res.status(201).json({ success: true, data: m, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.delete('/health-metrics/:id', async (req, res, next) => {
+  try {
+    await deleteHealthMetric(req.params['id']!, req.user!.userId)
+    res.json({ success: true, data: null, error: null })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Metric not found') {
+      res.status(404).json({ success: false, data: null, error: err.message })
+      return
+    }
+    next(err)
+  }
+})
+
+clientRouter.get('/health-metrics/weight-history', async (req, res, next) => {
+  try {
+    const days = req.query['days'] ? Number(req.query['days']) : 90
+    const history = await getWeightHistory(req.user!.userId, days)
+    res.json({ success: true, data: history, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientRouter.get('/health-metrics/latest', async (req, res, next) => {
+  try {
+    const latest = await getLatestMetric(req.user!.userId)
+    res.json({ success: true, data: latest, error: null })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// =====================================================
+// ANALYTICS
+// =====================================================
+
+clientRouter.get('/analytics', async (req, res, next) => {
+  try {
+    const days = req.query['days'] ? Number(req.query['days']) : 30
+    const [activity, insights, heatmap] = await Promise.all([
+      getDailyActivityRange(req.user!.userId, days),
+      getInsights(req.user!.userId),
+      getWorkoutHeatmap(req.user!.userId, 12),
+    ])
+    res.json({ success: true, data: { activity, insights, heatmap }, error: null })
+  } catch (err) {
+    next(err)
+  }
 })

@@ -551,30 +551,12 @@ export async function getDailyTotals(userId: string, startDate: Date, endDate: D
 }
 
 /**
- * Calculate suggested daily calorie target based on user profile.
- * Uses Harris-Benedict formula with activity multiplier.
- * NOT precise — just a reasonable starting target. Goal-based targets in Phase 7.
+ * Daily calorie target. Now goal-aware — delegates to goalService for the math.
+ * Active goal beats profile.primaryGoal for target calculation.
  */
 export async function getSuggestedDailyTarget(userId: string): Promise<number | null> {
-  const profile = await prisma.userProfile.findUnique({ where: { userId } })
-
-  if (!profile?.age || !profile.heightCm || !profile.currentWeightKg) {
-    return null
-  }
-
-  const age = profile.age
-  const heightCm = Number(profile.heightCm)
-  const weightKg = Number(profile.currentWeightKg)
-  const isMale = profile.gender === 'M'
-
-  // Mifflin-St Jeor equation
-  const bmr = isMale
-    ? 10 * weightKg + 6.25 * heightCm - 5 * age + 5
-    : 10 * weightKg + 6.25 * heightCm - 5 * age - 161
-
-  // Default activity multiplier: lightly active (1.375)
-  // Phase 7 will use goal-driven multipliers
-  const tdee = bmr * 1.375
-
-  return Math.round(tdee)
+  // Lazy import to avoid cyclic dep
+  const { getGoalAdjustedTarget } = await import('./goalService.js')
+  const result = await getGoalAdjustedTarget(userId)
+  return result.dailyCalorieTarget
 }

@@ -178,9 +178,9 @@ Run `npx prisma generate` to refresh TS client types.
 | 5 — Calorie tracker + AI hybrid | ✅ |
 | 5.1 — Edit logs, recent foods, trainer adds members, conversion leaderboard | ✅ |
 | 5.2 — UX restructure (bottom nav, calorie ring, FAB, 4-step onboarding, streaks) | ✅ |
-| 6 — Workout tracker | 🟡 in progress |
-| 7 — Goals + analytics | ⏸ |
-| 8 — Polish + security audit | ⏸ |
+| 6 — Workout tracker (self-improving: PR detection, frequent exercises, last-set pre-fill) | ✅ |
+| 7 — Goals + health metrics + analytics (Recharts: weight line, calorie bars, workout heatmap) | ✅ |
+| 8 — Polish + security audit | 🟡 in progress |
 
 ---
 

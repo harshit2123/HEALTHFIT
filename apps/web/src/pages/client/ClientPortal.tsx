@@ -9,6 +9,8 @@ import { QuickAddSheet } from '../../components/ui/QuickAddSheet'
 import { ClientDashboard } from './ClientDashboard'
 import { WorkoutsPage } from './workouts/WorkoutsPage'
 import { CaloriesPage } from './calories/CaloriesPage'
+import { GoalsPage } from './goals/GoalsPage'
+import { AnalyticsPage } from './analytics/AnalyticsPage'
 import { ProfilePage } from './profile/ProfilePage'
 import { UpgradePage } from './subscription/UpgradePage'
 
@@ -19,6 +21,8 @@ export function ClientPortal() {
         <Route index element={<ClientDashboard />} />
         <Route path="calories" element={<CaloriesPage />} />
         <Route path="workouts" element={<WorkoutsPage />} />
+        <Route path="goals" element={<GoalsPage />} />
+        <Route path="progress" element={<AnalyticsPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="upgrade" element={<UpgradePage />} />
         <Route path="*" element={<Navigate to="/client" replace />} />
@@ -59,6 +63,8 @@ function ClientLayout() {
           <SidebarLink to="/client" end>Home</SidebarLink>
           <SidebarLink to="/client/calories">Food</SidebarLink>
           <SidebarLink to="/client/workouts">Workouts</SidebarLink>
+          <SidebarLink to="/client/goals">Goals</SidebarLink>
+          <SidebarLink to="/client/progress">Progress</SidebarLink>
           <SidebarLink to="/client/profile">Me</SidebarLink>
         </nav>
         <div style={{ marginTop: '2rem', padding: '1rem', borderTop: '1px solid #e5e7eb' }}>

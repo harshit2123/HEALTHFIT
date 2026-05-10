@@ -42,10 +42,17 @@ export function QuickAddSheet({ open, onClose }: QuickAddSheetProps) {
           marginBottom: '1.25rem',
         }}
       >
-        <ActionTile icon="📷" label="Camera" onClick={() => alert('Camera logging — Phase 7')} disabled />
-        <ActionTile icon="🔍" label="Search" onClick={() => goToFood('search')} />
+        <ActionTile icon="🔍" label="Search food" onClick={() => goToFood('search')} />
         <ActionTile icon="✨" label="AI parse" onClick={() => goToFood('ai')} />
         <ActionTile icon="💪" label="Workout" onClick={goToWorkout} />
+        <ActionTile
+          icon="⚖️"
+          label="Weight"
+          onClick={() => {
+            onClose()
+            navigate('/client/progress')
+          }}
+        />
       </div>
 
       {/* Recent foods 1-tap log */}

@@ -436,3 +436,152 @@ export const workoutApi = {
     await api.delete(`/client/routines/${id}`)
   },
 }
+
+// =====================================================
+// GOALS + ANALYTICS + HEALTH METRICS
+// =====================================================
+
+export type GoalType =
+  | 'LOSE_WEIGHT'
+  | 'GAIN_MUSCLE'
+  | 'BUILD_ENDURANCE'
+  | 'IMPROVE_FLEXIBILITY'
+  | 'CUSTOM'
+
+export type GoalStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'ABANDONED'
+
+export interface Goal {
+  id: string
+  goalType: GoalType
+  targetValue: string
+  targetUnit: string
+  startingValue: string
+  targetDate: string
+  status: GoalStatus
+  reason: string | null
+  assignedById: string | null
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+}
+
+export interface GoalProgress {
+  goal: Goal
+  currentValue: number | null
+  percentComplete: number
+  daysRemaining: number
+  daysElapsed: number
+  expectedPercent: number
+  pace: 'ahead' | 'on_track' | 'behind'
+}
+
+export interface HealthMetric {
+  id: string
+  metricDate: string
+  weightKg: string | null
+  bmi: string | null
+  chestCm: string | null
+  waistCm: string | null
+  hipsCm: string | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface WeightHistoryPoint {
+  id: string
+  date: string
+  weightKg: number | null
+  bmi: number | null
+}
+
+export interface DailyActivityBucket {
+  date: string
+  calories: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+  workouts: number
+  workoutMinutes: number
+}
+
+export interface AnalyticsResponse {
+  activity: DailyActivityBucket[]
+  insights: string[]
+  heatmap: Array<{ date: string; count: number }>
+}
+
+export const goalApi = {
+  create: async (data: {
+    goalType: GoalType
+    targetValue: number
+    targetUnit: string
+    startingValue: number
+    targetDate: string
+    reason?: string
+  }): Promise<Goal> => {
+    const res = await api.post('/client/goals', data)
+    return res.data.data
+  },
+  list: async (status?: GoalStatus): Promise<Goal[]> => {
+    const res = await api.get('/client/goals', { params: status ? { status } : undefined })
+    return res.data.data
+  },
+  get: async (id: string): Promise<Goal> => {
+    const res = await api.get(`/client/goals/${id}`)
+    return res.data.data
+  },
+  getProgress: async (id: string): Promise<GoalProgress> => {
+    const res = await api.get(`/client/goals/${id}/progress`)
+    return res.data.data
+  },
+  update: async (
+    id: string,
+    data: { status?: GoalStatus; targetValue?: number; targetDate?: string; reason?: string }
+  ): Promise<Goal> => {
+    const res = await api.patch(`/client/goals/${id}`, data)
+    return res.data.data
+  },
+  delete: async (id: string) => {
+    await api.delete(`/client/goals/${id}`)
+  },
+  getActiveTarget: async (): Promise<{
+    dailyCalorieTarget: number | null
+    proteinTargetG: number | null
+    goalType: string | null
+  }> => {
+    const res = await api.get('/client/goals/active-target')
+    return res.data.data
+  },
+}
+
+export const healthApi = {
+  log: async (data: {
+    weightKg?: number
+    chestCm?: number
+    waistCm?: number
+    hipsCm?: number
+    notes?: string
+    metricDate?: string
+  }): Promise<HealthMetric> => {
+    const res = await api.post('/client/health-metrics', data)
+    return res.data.data
+  },
+  getWeightHistory: async (days = 90): Promise<WeightHistoryPoint[]> => {
+    const res = await api.get('/client/health-metrics/weight-history', { params: { days } })
+    return res.data.data
+  },
+  getLatest: async (): Promise<HealthMetric | null> => {
+    const res = await api.get('/client/health-metrics/latest')
+    return res.data.data
+  },
+  delete: async (id: string) => {
+    await api.delete(`/client/health-metrics/${id}`)
+  },
+}
+
+export const analyticsApi = {
+  get: async (days = 30): Promise<AnalyticsResponse> => {
+    const res = await api.get('/client/analytics', { params: { days } })
+    return res.data.data
+  },
+}

@@ -11,7 +11,8 @@ const ITEMS: NavItem[] = [
   { to: '/client', label: 'Home', icon: '🏠', end: true },
   { to: '/client/calories', label: 'Food', icon: '🍽️' },
   { to: '/client/workouts', label: 'Workouts', icon: '💪' },
-  { to: '/client/profile', label: 'Me', icon: '👤' },
+  { to: '/client/progress', label: 'Progress', icon: '📈' },
+  { to: '/client/goals', label: 'Goals', icon: '🎯' },
 ]
 
 /**
