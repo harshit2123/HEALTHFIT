@@ -24,9 +24,25 @@
     "deny": [
       "Bash(rm -rf /)",
       "Bash(rm -rf ~*)",
+      "Bash(rm -rf /*)",
       "Bash(git push --force*)",
+      "Bash(git push -f *)",
       "Bash(curl * | bash)",
-      "Bash(wget * | bash)"
+      "Bash(wget * | bash)",
+      "Bash(curl * | sh)",
+      "Bash(wget * | sh)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(nc *)",
+      "Bash(ncat *)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(**/.env*)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.config/gh/**)",
+      "Write(~/.ssh/**)",
+      "Write(~/.aws/**)",
+      "Write(~/.gnupg/**)"
     ],
     "additionalDirectories": [
       "/Users/harshit/Desktop"

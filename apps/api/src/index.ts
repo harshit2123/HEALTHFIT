@@ -16,6 +16,9 @@ const app = express()
 const PORT = Number(process.env['PORT'] ?? 4000)
 const isProduction = process.env['NODE_ENV'] === 'production'
 
+// Trust first proxy hop so req.ip is the real client IP (needed for rate limiting behind ALB/Nginx)
+app.set('trust proxy', 1)
+
 // Security headers — helmet defaults are sane
 app.use(
   helmet({
@@ -38,6 +41,14 @@ const corsOrigins = (process.env['CORS_ORIGINS'] ?? process.env['CLIENT_URL'] ??
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
+
+if (isProduction) {
+  for (const origin of corsOrigins) {
+    if (!origin.startsWith('https://')) {
+      throw new Error(`[spacefit] Invalid CORS origin in production: ${origin}`)
+    }
+  }
+}
 
 app.use(
   cors({

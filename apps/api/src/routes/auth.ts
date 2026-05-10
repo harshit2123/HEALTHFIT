@@ -78,7 +78,7 @@ authRouter.post('/login', async (req, res, next) => {
     const result = await login(parsed.data.email, parsed.data.password)
     res.json({ success: true, data: result, error: null })
   } catch (err) {
-    if (err instanceof Error && (err.message === 'Invalid credentials' || err.message === 'Account suspended')) {
+    if (err instanceof Error && err.message === 'Invalid credentials') {
       res.status(401).json({ success: false, data: null, error: err.message })
       return
     }

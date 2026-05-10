@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios'
-import { getToken, clearSession, saveSession } from './auth'
+import { getToken, clearSession, saveSession, REFRESH_TOKEN_KEY } from './auth'
 import type { User } from '@spacefit/shared'
 
 const API_BASE = import.meta.env['VITE_API_URL'] ?? 'http://localhost:4000/api'
@@ -48,15 +48,18 @@ api.interceptors.response.use(
     isRefreshing = true
 
     try {
-      const refreshToken = localStorage.getItem('spacefit_refresh')
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
       if (!refreshToken) throw new Error('No refresh token')
 
-      const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken })
+      interface RefreshResponse { accessToken: string; refreshToken: string }
+      const { data } = await axios.post<{ data: RefreshResponse }>(`${API_BASE}/auth/refresh`, { refreshToken })
       const newAccessToken = data.data.accessToken
       const newRefreshToken = data.data.refreshToken
 
+      if (typeof newAccessToken !== 'string' || !newAccessToken) throw new Error('Bad refresh response')
+
       localStorage.setItem('spacefit_token', newAccessToken)
-      localStorage.setItem('spacefit_refresh', newRefreshToken)
+      localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken)
 
       refreshQueue.forEach((cb) => cb(newAccessToken))
       refreshQueue = []
@@ -67,8 +70,6 @@ api.interceptors.response.use(
       refreshQueue.forEach((cb) => cb(null))
       refreshQueue = []
       clearSession()
-      localStorage.removeItem('spacefit_refresh')
-      window.location.href = '/login'
       return Promise.reject(refreshError)
     } finally {
       isRefreshing = false
@@ -123,5 +124,5 @@ export const authApi = {
 
 export function persistAuth(result: AuthResult) {
   saveSession(result.accessToken, result.user)
-  localStorage.setItem('spacefit_refresh', result.refreshToken)
+  localStorage.setItem(REFRESH_TOKEN_KEY, result.refreshToken)
 }

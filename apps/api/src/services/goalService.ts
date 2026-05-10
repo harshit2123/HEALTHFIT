@@ -93,8 +93,13 @@ export async function getGoalProgress(goalId: string, userId: string) {
   const startingValue = Number(goal.startingValue)
   const targetValue = Number(goal.targetValue)
   const totalDelta = Math.abs(targetValue - startingValue)
-  const progressDelta = currentValue !== null ? Math.abs(currentValue - startingValue) : 0
-  const percentComplete = totalDelta > 0 ? Math.min(100, (progressDelta / totalDelta) * 100) : 0
+  // Signed delta: positive means moving toward target, negative means regressing
+  const progressDelta = currentValue !== null
+    ? (targetValue > startingValue
+        ? currentValue - startingValue   // gaining: higher is better
+        : startingValue - currentValue)  // losing: lower is better
+    : 0
+  const percentComplete = totalDelta > 0 ? Math.min(100, Math.max(0, (progressDelta / totalDelta) * 100)) : 0
 
   const now = new Date()
   const daysRemaining = Math.max(

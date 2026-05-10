@@ -156,7 +156,7 @@ adminRouter.patch('/members/:id', async (req, res, next) => {
     )
     res.json({ success: true, data: updated, error: null })
   } catch (err) {
-    if (err instanceof Error) {
+    if (err instanceof Error && (err.message === 'Access denied' || err.message === 'Trainers cannot deactivate members')) {
       res.status(403).json({ success: false, data: null, error: err.message })
       return
     }
@@ -392,7 +392,7 @@ adminRouter.post(
       )
       res.json({ success: true, data: sub, error: null })
     } catch (err) {
-      if (err instanceof Error) {
+      if (err instanceof Error && (err.message === 'Member not found in org' || err.message === 'Plan not found or archived' || err.message === 'Plan member capacity reached')) {
         res.status(404).json({ success: false, data: null, error: err.message })
         return
       }
@@ -501,7 +501,7 @@ adminRouter.post('/notifications', requireRole(['ORG_OWNER']), async (req, res, 
 
 adminRouter.get('/notifications', async (req, res, next) => {
   try {
-    const limit = req.query['limit'] ? Number(req.query['limit']) : 50
+    const limit = Math.min(req.query['limit'] ? Number(req.query['limit']) : 50, 200)
     const notifs = await listNotifications(req.user!.orgId!, limit)
     res.json({ success: true, data: notifs, error: null })
   } catch (err) {

@@ -122,7 +122,7 @@ export async function assignOrRenewSubscription(
     // Atomic capacity check inside transaction — no TOCTOU race window
     if (plan.memberCapacity !== null) {
       const activeCount = await tx.memberSubscription.count({
-        where: { planId, status: { in: ['ACTIVE', 'EXPIRING'] } },
+        where: { planId, status: { notIn: ['EXPIRED', 'CANCELLED'] } },
       })
       if (activeCount >= plan.memberCapacity) {
         throw new Error('Plan member capacity reached')
@@ -163,15 +163,11 @@ export async function assignOrRenewSubscription(
 }
 
 export async function cancelMemberSubscription(memberId: string, orgId: string) {
-  const sub = await prisma.memberSubscription.findFirst({
+  const result = await prisma.memberSubscription.updateMany({
     where: { memberId, orgId },
-  })
-  if (!sub) throw new Error('Subscription not found')
-
-  return prisma.memberSubscription.update({
-    where: { id: sub.id },
     data: { status: 'CANCELLED' },
   })
+  if (result.count === 0) throw new Error('Subscription not found')
 }
 
 /**

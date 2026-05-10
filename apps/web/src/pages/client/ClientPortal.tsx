@@ -57,8 +57,8 @@ function ClientLayout() {
       {/* Desktop sidebar */}
       <aside className="desktop-sidebar" style={sidebar}>
         <div style={logoWrap}>
-          <span style={logoText}>fit</span>
-          <span style={logoDot} />
+          <img src="/logo-icon.png" alt="Spacefit" style={logoImg} />
+          <span style={logoText}><span style={{ color: '#fff' }}>SPACE</span><span style={{ color: 'var(--neon)' }}>FIT</span></span>
         </div>
 
         <SubscriptionBadge sub={sub} />
@@ -89,9 +89,9 @@ function ClientLayout() {
 
       {/* Mobile top bar */}
       <header className="mobile-topbar sf-glass" style={topbar}>
-        <div style={logoWrap}>
-          <span style={logoText}>fit</span>
-          <span style={logoDot} />
+        <div style={{ ...logoWrap, marginBottom: 0 }}>
+          <img src="/logo-icon.png" alt="Spacefit" style={logoImg} />
+          <span style={logoText}><span style={{ color: '#fff' }}>SPACE</span><span style={{ color: 'var(--neon)' }}>FIT</span></span>
         </div>
         <Link to="/client/profile" style={avatarLink} aria-label="Profile">
           {initial}
@@ -206,7 +206,7 @@ function SubscriptionBadge({
 // ─── Styles ────────────────────────────────────────────────────────────────
 
 const shell: CSSProperties = {
-  minHeight: '100vh',
+  minHeight: '100svh',
   background: 'var(--bg-primary)',
   color: 'var(--text-primary)',
   fontFamily: 'var(--font-body)',
@@ -229,29 +229,24 @@ const sidebar: CSSProperties = {
 
 const logoWrap: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-end',
-  gap: '3px',
+  alignItems: 'center',
+  gap: '0.5rem',
   marginBottom: '1.5rem',
+}
+
+const logoImg: CSSProperties = {
+  width: '32px',
+  height: '32px',
+  flexShrink: 0,
 }
 
 const logoText: CSSProperties = {
   fontFamily: 'var(--font-display)',
-  fontWeight: 800,
-  fontSize: '1.75rem',
-  color: 'var(--text-primary)',
-  letterSpacing: '-0.02em',
+  fontWeight: 900,
+  fontSize: '1.15rem',
+  letterSpacing: '0.1em',
+  fontStyle: 'italic',
   lineHeight: 1,
-}
-
-const logoDot: CSSProperties = {
-  width: '6px',
-  height: '6px',
-  borderRadius: '50%',
-  background: 'var(--neon)',
-  boxShadow: '0 0 8px var(--neon)',
-  display: 'inline-block',
-  marginBottom: '4px',
-  flexShrink: 0,
 }
 
 const navWrap: CSSProperties = {
@@ -317,32 +312,35 @@ const topbar: CSSProperties = {
   position: 'sticky',
   top: 0,
   padding: '0.75rem 1rem',
+  paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   zIndex: 20,
-  borderBottom: '1px solid var(--neon-border)',
+  borderBottom: '1px solid rgba(0,255,46,0.08)',
 }
 
 const avatarLink: CSSProperties = {
-  width: '34px',
-  height: '34px',
+  width: '36px',
+  height: '36px',
   borderRadius: '50%',
-  background: 'var(--neon)',
-  color: '#050505',
+  background: 'var(--bg-card)',
+  border: '1.5px solid var(--neon-border)',
+  color: 'var(--neon)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   fontFamily: 'var(--font-display)',
   fontWeight: 800,
-  fontSize: '0.95rem',
+  fontSize: '1rem',
   textDecoration: 'none',
 }
 
 const main: CSSProperties = {
-  padding: '1.25rem',
-  paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0))',
-  minHeight: '100vh',
+  padding: '1rem 1rem',
+  paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
+  minHeight: '100svh',
+  maxWidth: '100%',
 }
 
 function subCard(bg: string, border: string): CSSProperties {

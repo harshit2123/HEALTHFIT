@@ -23,8 +23,8 @@ export function RegisterPage() {
       <div style={pageWrap}>
         <main style={card} className="sf-animate-in">
           <div style={logoWrap}>
-            <span style={logoText}>fit</span>
-            <span style={logoDot} />
+            <img src="/logo-icon.png" alt="Spacefit" style={logoImg} />
+            <span style={logoText}><span style={{ color: '#fff' }}>SPACE</span><span style={{ color: 'var(--neon)' }}>FIT</span></span>
           </div>
           <h1 style={heading}>Join Spacefit</h1>
           <p style={sub}>How will you use Spacefit?</p>
@@ -119,8 +119,8 @@ function RegisterB2CFlow({ onBack }: { onBack: () => void }) {
       <main style={{ ...card, maxWidth: '480px' }} className="sf-animate-in">
         {/* Logo */}
         <div style={logoWrap}>
-          <span style={logoText}>fit</span>
-          <span style={logoDot} />
+          <img src="/logo-icon.png" alt="Spacefit" style={logoImg} />
+          <span style={logoText}><span style={{ color: '#fff' }}>SPACE</span><span style={{ color: 'var(--neon)' }}>FIT</span></span>
         </div>
 
         {/* Progress dots */}
@@ -267,8 +267,8 @@ function RegisterB2BForm({ onBack }: { onBack: () => void }) {
     <div style={pageWrap}>
       <main style={{ ...card, maxWidth: '480px' }} className="sf-animate-in">
         <div style={logoWrap}>
-          <span style={logoText}>fit</span>
-          <span style={logoDot} />
+          <img src="/logo-icon.png" alt="Spacefit" style={logoImg} />
+          <span style={logoText}><span style={{ color: '#fff' }}>SPACE</span><span style={{ color: 'var(--neon)' }}>FIT</span></span>
         </div>
         <button onClick={onBack} style={backBtn}>← Back</button>
         <h1 style={heading}>Set up your gym</h1>
@@ -325,9 +325,9 @@ const pageWrap: CSSProperties = { minHeight: '100vh', display: 'flex', alignItem
 
 const card: CSSProperties = { width: '100%', maxWidth: '400px', padding: '2rem 2rem 1.75rem', background: 'var(--bg-card)', border: '1px solid var(--neon-border)', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '0' }
 
-const logoWrap: CSSProperties = { display: 'flex', alignItems: 'flex-end', gap: '3px', marginBottom: '1.5rem' }
-const logoText: CSSProperties = { fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem', color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1 }
-const logoDot: CSSProperties = { width: '7px', height: '7px', borderRadius: '50%', background: 'var(--neon)', boxShadow: '0 0 10px var(--neon)', display: 'inline-block', marginBottom: '5px', flexShrink: 0 }
+const logoWrap: CSSProperties = { display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }
+const logoImg: CSSProperties = { width: '36px', height: '36px', flexShrink: 0 }
+const logoText: CSSProperties = { fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.2rem', letterSpacing: '0.1em', fontStyle: 'italic', lineHeight: 1 }
 
 const heading: CSSProperties = { fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.6rem', color: 'var(--text-primary)', letterSpacing: '-0.01em', margin: 0 }
 const sub: CSSProperties = { fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 1.25rem' }

@@ -30,12 +30,16 @@ class GeminiProvider implements AIProvider {
     const key = process.env['GEMINI_API_KEY']
     if (!key) return null
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.getModel()}:generateContent?key=${key}`
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.getModel()}:generateContent`
 
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key,
+        },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: [{ role: 'user', parts: [{ text: prompt }] }],

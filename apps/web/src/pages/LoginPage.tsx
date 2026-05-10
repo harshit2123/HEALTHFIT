@@ -39,12 +39,12 @@ export function LoginPage() {
       <main style={card} className="sf-animate-in">
         {/* Logo */}
         <div style={logoWrap}>
-          <span style={logoText}>fit</span>
-          <span style={logoDot} />
+          <img src="/logo-icon.png" alt="Spacefit" style={logoImg} />
+          <span style={logoText}><span style={{ color: '#fff' }}>SPACE</span><span style={{ color: 'var(--neon)' }}>FIT</span></span>
         </div>
 
         <h1 style={heading}>Welcome back</h1>
-        <p style={sub}>Sign in to your account</p>
+        <p style={sub}>Sign in to continue</p>
 
         <form onSubmit={handleSubmit} style={form}>
           <label style={fieldWrap}>
@@ -91,62 +91,61 @@ export function LoginPage() {
 }
 
 const pageWrap: CSSProperties = {
-  minHeight: '100vh',
+  minHeight: '100svh',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '1.5rem',
   background: 'var(--bg-primary)',
+  position: 'relative',
 }
 
 const card: CSSProperties = {
   width: '100%',
   maxWidth: '400px',
-  padding: '2rem 2rem 1.75rem',
+  padding: '2rem',
   background: 'var(--bg-card)',
   border: '1px solid var(--neon-border)',
   borderRadius: 'var(--radius-xl)',
+  boxShadow: '0 0 60px rgba(0,255,46,0.04)',
 }
 
 const logoWrap: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-end',
-  gap: '3px',
+  alignItems: 'center',
+  gap: '0.5rem',
   marginBottom: '1.75rem',
+}
+
+const logoImg: CSSProperties = {
+  width: '40px',
+  height: '40px',
 }
 
 const logoText: CSSProperties = {
   fontFamily: 'var(--font-display)',
-  fontWeight: 800,
-  fontSize: '2rem',
-  color: 'var(--text-primary)',
-  letterSpacing: '-0.02em',
+  fontWeight: 900,
+  fontSize: '1.4rem',
+  letterSpacing: '0.1em',
+  fontStyle: 'italic',
   lineHeight: 1,
-}
-
-const logoDot: CSSProperties = {
-  width: '7px',
-  height: '7px',
-  borderRadius: '50%',
-  background: 'var(--neon)',
-  boxShadow: '0 0 10px var(--neon)',
-  display: 'inline-block',
-  marginBottom: '5px',
-  flexShrink: 0,
 }
 
 const heading: CSSProperties = {
   fontFamily: 'var(--font-display)',
-  fontWeight: 800,
-  fontSize: '1.6rem',
+  fontWeight: 900,
+  fontSize: '1.8rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
   color: 'var(--text-primary)',
-  letterSpacing: '-0.01em',
   margin: 0,
 }
 
 const sub: CSSProperties = {
-  fontFamily: 'var(--font-body)',
-  fontSize: '0.8rem',
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.6rem',
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
   color: 'var(--text-muted)',
   margin: '0.25rem 0 1.5rem',
 }

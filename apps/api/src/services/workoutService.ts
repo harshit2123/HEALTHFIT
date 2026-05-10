@@ -8,22 +8,25 @@ import { estimateExercise, isAIConfigured, normalizeSearchKey } from './ai/exerc
 // =====================================================
 
 export async function searchExercises(query: string, userId: string, limit = 20) {
+  const safeLimit = Math.min(limit, 100)
+  const visibilityFilter = {
+    OR: [
+      { isCustom: false },
+      ...(userId ? [{ isCustom: true, createdByUserId: userId }] : []),
+    ],
+  }
+  const nameFilter = query.trim()
+    ? {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' as const } },
+          { nameLocal: { contains: query, mode: 'insensitive' as const } },
+        ],
+      }
+    : undefined
+
   return prisma.exercise.findMany({
-    where: {
-      OR: [
-        { isCustom: false },
-        ...(userId ? [{ isCustom: true, createdByUserId: userId }] : []),
-      ],
-      ...(query.trim()
-        ? {
-            OR: [
-              { name: { contains: query, mode: 'insensitive' as const } },
-              { nameLocal: { contains: query, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
-    },
-    take: limit,
+    where: nameFilter ? { AND: [visibilityFilter, nameFilter] } : visibilityFilter,
+    take: safeLimit,
     orderBy: [{ usageCount: 'desc' }, { name: 'asc' }],
   })
 }

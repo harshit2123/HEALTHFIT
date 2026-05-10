@@ -282,7 +282,7 @@ clientRouter.delete('/workouts/:id', async (req, res, next) => {
 clientRouter.get('/exercises/search', async (req, res, next) => {
   try {
     const q = typeof req.query['q'] === 'string' ? req.query['q'] : ''
-    const limit = req.query['limit'] ? Number(req.query['limit']) : 20
+    const limit = Math.min(req.query['limit'] ? Number(req.query['limit']) : 20, 100)
     const items = await searchExercises(q, req.user!.userId, limit)
     res.json({ success: true, data: items, error: null })
   } catch (err) {
@@ -292,7 +292,7 @@ clientRouter.get('/exercises/search', async (req, res, next) => {
 
 clientRouter.get('/exercises/frequent', async (req, res, next) => {
   try {
-    const limit = req.query['limit'] ? Number(req.query['limit']) : 8
+    const limit = Math.min(req.query['limit'] ? Number(req.query['limit']) : 8, 50)
     const items = await getFrequentExercises(req.user!.userId, limit)
     res.json({ success: true, data: items, error: null })
   } catch (err) {
@@ -573,7 +573,7 @@ clientRouter.get('/streak', async (req, res, next) => {
 clientRouter.get('/foods/search', async (req, res, next) => {
   try {
     const q = typeof req.query['q'] === 'string' ? req.query['q'] : ''
-    const limit = req.query['limit'] ? Number(req.query['limit']) : 20
+    const limit = Math.min(req.query['limit'] ? Number(req.query['limit']) : 20, 100)
     const foods = await searchFoods(q, req.user!.userId, limit)
     res.json({ success: true, data: foods, error: null })
   } catch (err) {
@@ -585,7 +585,7 @@ clientRouter.get('/foods/search', async (req, res, next) => {
 // UI shows these at the top of the meal-add dialog.
 clientRouter.get('/foods/suggestions', async (req, res, next) => {
   try {
-    const limit = req.query['limit'] ? Number(req.query['limit']) : 8
+    const limit = Math.min(req.query['limit'] ? Number(req.query['limit']) : 8, 50)
     const result = await getPersonalFoodSuggestions(req.user!.userId, limit)
     res.json({ success: true, data: result, error: null })
   } catch (err) {

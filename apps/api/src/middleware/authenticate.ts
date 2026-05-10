@@ -13,12 +13,12 @@ declare global {
 }
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
-  const token = req.headers.authorization?.split(' ')[1]
-
-  if (!token) {
+  const authHeader = req.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) {
     res.status(401).json({ success: false, data: null, error: 'No token provided' })
     return
   }
+  const token = authHeader.slice(7)
 
   try {
     const raw = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] })

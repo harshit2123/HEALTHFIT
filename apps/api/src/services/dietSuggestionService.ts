@@ -128,10 +128,12 @@ export async function getDietSuggestions(userId: string): Promise<NutrientGap[]>
 }
 
 async function getTodayTotals(userId: string, date: string) {
+  const dayStart = new Date(`${date}T00:00:00.000Z`)
+  const dayEnd = new Date(`${date}T23:59:59.999Z`)
   const logs = await prisma.calorieLog.findMany({
     where: {
       userId,
-      loggedDate: new Date(date),
+      loggedDate: { gte: dayStart, lte: dayEnd },
     },
     select: {
       calories: true,

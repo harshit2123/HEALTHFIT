@@ -187,8 +187,7 @@ export async function registerB2CIndividual(input: RegisterB2CInput): Promise<Au
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const user = await prisma.user.findUnique({ where: { email } })
-  if (!user) throw new Error('Invalid credentials')
-  if (!user.isActive) throw new Error('Account suspended')
+  if (!user || !user.isActive) throw new Error('Invalid credentials')
 
   const valid = await verifyPassword(password, user.passwordHash)
   if (!valid) throw new Error('Invalid credentials')

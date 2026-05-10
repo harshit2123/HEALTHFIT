@@ -275,7 +275,7 @@ export async function updateMember(
   await getMemberById(memberId, orgId, viewerRole, viewerId)
 
   // Trainers cannot deactivate
-  if (viewerRole === 'TRAINER' && 'isActive' in updates) {
+  if (viewerRole === 'TRAINER' && updates.isActive !== undefined) {
     throw new Error('Trainers cannot deactivate members')
   }
 

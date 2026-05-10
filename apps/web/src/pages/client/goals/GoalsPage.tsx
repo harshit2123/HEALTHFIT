@@ -4,11 +4,11 @@ import { goalApi, type Goal, type GoalType } from '../../../lib/clientApi'
 import type { CSSProperties } from 'react'
 
 const GOAL_LABELS: Record<GoalType, { label: string; icon: string; defaultUnit: string }> = {
-  LOSE_WEIGHT:         { label: 'Lose weight',         icon: '⚖', defaultUnit: 'kg' },
-  GAIN_MUSCLE:         { label: 'Gain muscle',          icon: '↑', defaultUnit: 'kg' },
-  BUILD_ENDURANCE:     { label: 'Build endurance',      icon: '◎', defaultUnit: 'minutes' },
-  IMPROVE_FLEXIBILITY: { label: 'Improve flexibility',  icon: '∿', defaultUnit: 'sessions' },
-  CUSTOM:              { label: 'Custom goal',          icon: '◈', defaultUnit: 'count' },
+  LOSE_WEIGHT:         { label: 'Lose Weight',         icon: '⚖️', defaultUnit: 'kg' },
+  GAIN_MUSCLE:         { label: 'Gain Muscle',          icon: '💪', defaultUnit: 'kg' },
+  BUILD_ENDURANCE:     { label: 'Endurance',            icon: '🏃', defaultUnit: 'minutes' },
+  IMPROVE_FLEXIBILITY: { label: 'Flexibility',          icon: '🧘', defaultUnit: 'sessions' },
+  CUSTOM:              { label: 'Custom Goal',          icon: '🎯', defaultUnit: 'count' },
 }
 
 export function GoalsPage() {
@@ -287,38 +287,47 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ─── styles ──────────────────────────────────────────────────────────────────
 
-const pageWrap: CSSProperties = { maxWidth: '720px', margin: '0 auto' }
+const pageWrap: CSSProperties = {
+  maxWidth: '480px',
+  margin: '0 auto',
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+}
 
 const pageHeader: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-end',
-  marginBottom: '2rem',
 }
 
 const heading: CSSProperties = {
   margin: 0,
   fontFamily: 'var(--font-display)',
-  fontWeight: 800,
-  fontSize: '2rem',
+  fontWeight: 900,
+  fontSize: '2.2rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.02em',
   color: 'var(--text-primary)',
-  letterSpacing: '-0.02em',
 }
 
 const sub: CSSProperties = {
-  margin: '0.25rem 0 0',
-  fontFamily: 'var(--font-body)',
-  fontSize: '0.8rem',
+  margin: '2px 0 0',
+  fontFamily: 'var(--font-mono)',
+  fontSize: '0.6rem',
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
   color: 'var(--text-muted)',
 }
 
 const newGoalBtn: CSSProperties = { padding: '0.6rem 1.25rem', flexShrink: 0 }
 
 const sectionLabel: CSSProperties = {
-  margin: '0 0 0.75rem',
+  margin: '0 0 0.625rem',
   fontFamily: 'var(--font-mono)',
-  fontSize: '0.62rem',
-  letterSpacing: '0.12em',
+  fontSize: '0.6rem',
+  letterSpacing: '0.16em',
   textTransform: 'uppercase',
   color: 'var(--text-muted)',
 }

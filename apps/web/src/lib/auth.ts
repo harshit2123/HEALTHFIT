@@ -3,6 +3,7 @@ import type { User, UserRole, AccountType } from '@spacefit/shared'
 
 const TOKEN_KEY = 'spacefit_token'
 const USER_KEY = 'spacefit_user'
+export const REFRESH_TOKEN_KEY = 'spacefit_refresh'
 
 const userSchema = z.object({
   id: z.string(),
@@ -41,6 +42,7 @@ export function getUser(): User | null {
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
 }
 
 export function getPortalPath(role: UserRole): string {

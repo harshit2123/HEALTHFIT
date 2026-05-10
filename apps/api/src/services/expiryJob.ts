@@ -25,35 +25,45 @@ let intervalHandle: NodeJS.Timeout | null = null
 let lastDailyReminderRun: string | null = null // YYYY-MM-DD
 
 async function runExpiryProcessing() {
-  try {
-    const [b2b, b2c, scheduled] = await Promise.all([
-      processExpiringSubscriptions(),
-      processPersonalSubscriptions(),
-      processScheduledNotifications(),
-    ])
+  const [b2bResult, b2cResult, scheduledResult] = await Promise.allSettled([
+    processExpiringSubscriptions(),
+    processPersonalSubscriptions(),
+    processScheduledNotifications(),
+  ])
 
+  if (b2bResult.status === 'rejected') {
+    console.error('[expiry] B2B processing failed:', b2bResult.reason)
+  } else {
+    const b2b = b2bResult.value
     if (b2b.markedExpiring > 0 || b2b.markedExpired > 0) {
-      console.log(
-        `[expiry] B2B: ${b2b.markedExpiring} marked expiring, ${b2b.markedExpired} expired`
-      )
+      console.log(`[expiry] B2B: ${b2b.markedExpiring} marked expiring, ${b2b.markedExpired} expired`)
     }
-    if (b2c.trialsExpired > 0 || b2c.premiumExpired > 0) {
-      console.log(
-        `[expiry] B2C: ${b2c.trialsExpired} trials expired, ${b2c.premiumExpired} premium expired`
-      )
-    }
-    if (scheduled.dispatched > 0) {
-      console.log(`[expiry] Dispatched ${scheduled.dispatched} scheduled notifications`)
-    }
+  }
 
-    // Auto-send expiry reminders once per day (idempotent inside service)
-    const today = new Date().toISOString().slice(0, 10)
-    if (lastDailyReminderRun !== today) {
+  if (b2cResult.status === 'rejected') {
+    console.error('[expiry] B2C processing failed:', b2cResult.reason)
+  } else {
+    const b2c = b2cResult.value
+    if (b2c.trialsExpired > 0 || b2c.premiumExpired > 0) {
+      console.log(`[expiry] B2C: ${b2c.trialsExpired} trials expired, ${b2c.premiumExpired} premium expired`)
+    }
+  }
+
+  if (scheduledResult.status === 'rejected') {
+    console.error('[expiry] Scheduled notifications failed:', scheduledResult.reason)
+  } else if (scheduledResult.value.dispatched > 0) {
+    console.log(`[expiry] Dispatched ${scheduledResult.value.dispatched} scheduled notifications`)
+  }
+
+  // Auto-send expiry reminders once per day (idempotent inside service)
+  const today = new Date().toISOString().slice(0, 10)
+  if (lastDailyReminderRun !== today) {
+    try {
       await sendExpiryReminders()
       lastDailyReminderRun = today
+    } catch (err) {
+      console.error('[expiry] Daily reminders failed:', err)
     }
-  } catch (err) {
-    console.error('[expiry] Job failed:', err)
   }
 }
 
